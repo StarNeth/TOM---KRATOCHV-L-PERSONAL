@@ -75,14 +75,14 @@ export const Hero = () => {
     <section ref={containerRef} className="relative h-screen w-full flex flex-col justify-center items-center z-10 overflow-hidden perspective-[1000px]">
       <div className="relative z-10 flex flex-col items-center w-full px-4 mix-blend-difference">
 
-        <h1
-          ref={nameRef}
-          className="relative text-[clamp(2.5rem,8.5vw,10rem)] font-sans font-black tracking-tighter leading-[0.85] uppercase text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.15)] text-center will-change-transform"
-        >
-          {/* [ ! ] POUŽITÍ SLOVNÍKU */}
-          <span className="block">{content.firstName}</span>
-          <span className="block text-white/90">{content.lastName}</span>
-        </h1>
+      <h1 
+        ref={nameRef}
+        // Na mobilu text-5xl, na desktopu ten tvůj původní obří clamp
+        className="relative text-5xl md:text-[clamp(2.5rem,8.5vw,10rem)] font-sans font-black tracking-tighter leading-[0.9] uppercase text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.15)] text-center will-change-transform break-words w-full"
+      >
+        <span className="block">TOMÁŠ</span>
+        <span className="block text-white/90">KRATOCHVÍL</span>
+      </h1>
 
         <div className="hero-ui h-px bg-gradient-to-r from-transparent via-white/50 to-transparent mt-12 w-[120px]" />
       </div>

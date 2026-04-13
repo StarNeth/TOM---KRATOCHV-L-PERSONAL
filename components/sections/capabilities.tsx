@@ -18,16 +18,15 @@ export const Capabilities = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const nodesRef = useRef<HTMLDivElement[]>([]);
-  const innerNodesRef = useRef<HTMLDivElement[]>([]); // Pro animaci zmenšování
+  const innerNodesRef = useRef<HTMLDivElement[]>([]); 
   const ringRefs = useRef<HTMLDivElement[]>([]);
-
-  // Trackování nabíjení
   const isCharging = useRef<boolean[]>(new Array(skillsData.length).fill(false));
 
   const physicsState = useRef(
     skillsData.map((_, i) => ({
-      x: (i % 4) * 200 + 150,
-      y: Math.floor(i / 4) * 200 + 150,
+      // Výchozí pozice blíž u sebe, aby to na mobilu hned nenasaltovalo na stěny
+      x: (i % 3) * 100 + 100,
+      y: Math.floor(i / 3) * 100 + 100,
       vx: 0, vy: 0, rotation: Math.random() * 360, rotSpeed: 0.5
     }))
   );
@@ -71,10 +70,13 @@ export const Capabilities = () => {
     const container = containerRef.current;
     if (!container) return;
 
+    // OPRAVA PRO MOBIL: Změříme si šířku. Pokud je to mobil (<768px), radikálně zmenšíme fyzikální hitboxy.
+    const isMobile = window.innerWidth < 768;
+    const collisionRadius = isMobile ? 110 : 200;
+    const boundaryPadding = isMobile ? 40 : 80;
+
     let animationFrameId: number;
     const friction = 0.94;
-    const boundaryPadding = 80;
-    const collisionRadius = 200;
 
     const updatePhysics = () => {
       const { width, height } = container.getBoundingClientRect();
@@ -132,21 +134,18 @@ export const Capabilities = () => {
     return () => cancelAnimationFrame(animationFrameId);
   }, []);
 
-  // === INTERAKCE: HOLD & RELEASE ===
   const handleChargeStart = (index: number) => {
     isCharging.current[index] = true;
     const inner = innerNodesRef.current[index];
     const ring = ringRefs.current[index];
 
     gsap.killTweensOf(inner); gsap.killTweensOf(ring);
-
-    // Nabíjení (smrsknutí, červený glow, brutální rotace)
     gsap.to(inner, { scale: 0.85, duration: 0.5, ease: "power2.out" });
     gsap.to(ring, { borderColor: "rgba(255, 42, 0, 0.8)", boxShadow: "0 0 20px rgba(255,42,0,0.5)", duration: 0.3 });
     physicsState.current[index].rotSpeed = 30;
   };
 
-  const handleChargeRelease = (e: React.MouseEvent, index: number) => {
+  const handleChargeRelease = (e: React.MouseEvent | React.TouchEvent, index: number) => {
     if (!isCharging.current[index]) return;
     isCharging.current[index] = false;
 
@@ -154,15 +153,10 @@ export const Capabilities = () => {
     const ring = ringRefs.current[index];
 
     gsap.killTweensOf(inner); gsap.killTweensOf(ring);
-
-    // Bounce zpět
     gsap.to(inner, { scale: 1, duration: 0.6, ease: "elastic.out(1.2, 0.3)" });
     gsap.to(ring, { borderColor: "rgba(255, 255, 255, 0.1)", boxShadow: "none", duration: 0.8 });
 
-    // VÝSTŘEL DO WEBGL
-    window.dispatchEvent(new CustomEvent("webgl-shoot", { detail: { x: e.clientX, y: e.clientY } }));
-
-    // MATRIX FLASH
+    // Matrix Flash
     if (canvasRef.current) {
       gsap.fromTo(canvasRef.current,
         { opacity: 1, filter: "brightness(2) contrast(1.5)" },
@@ -170,11 +164,16 @@ export const Capabilities = () => {
       );
     }
 
-    // ODMTRŠTĚNÍ OSTATNÍCH UZLŮ
+    // Touch event clientX/Y fallback
+    const clientX = 'touches' in e ? e.changedTouches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.changedTouches[0].clientY : e.clientY;
+    
+    window.dispatchEvent(new CustomEvent("webgl-shoot", { detail: { x: clientX, y: clientY } }));
+
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    const clickX = clientX - rect.left;
+    const clickY = clientY - rect.top;
 
     physicsState.current.forEach((node, i) => {
       if (i === index) { node.rotSpeed = 60; return; }
@@ -192,14 +191,15 @@ export const Capabilities = () => {
 
   return (
     <section ref={sectionRef} id="capabilities" className="relative w-full h-[120vh] z-10 text-white flex flex-col items-center justify-center pt-24 pb-32">
-      <div className="cap-title flex flex-col items-center mb-12 mix-blend-difference pointer-events-none">
-        <h2 className="font-syne font-bold text-5xl md:text-8xl uppercase tracking-tighter">Architecture</h2>
-        <p className="font-mono text-xs tracking-[0.3em] uppercase text-white/50 mt-4">
+      <div className="cap-title flex flex-col items-center mb-8 md:mb-12 mix-blend-difference pointer-events-none px-4 text-center">
+        {/* OPRAVA: Titulek a p text je responzivnější */}
+        <h2 className="font-syne font-bold text-4xl md:text-8xl uppercase tracking-tighter">Architecture</h2>
+        <p className="font-mono text-[8px] md:text-xs tracking-[0.2em] md:tracking-[0.3em] uppercase text-white/50 mt-4 max-w-[80vw]">
           [ Containment Field ] — Hold node to charge. Release to fire.
         </p>
       </div>
 
-      <div ref={containerRef} className="relative w-[90vw] max-w-6xl h-[70vh] bg-black/20 backdrop-blur-xl border border-white/10 rounded-[1rem] overflow-hidden shadow-[0_0_50px_rgba(255,255,255,0.01)]">
+      <div ref={containerRef} className="relative w-[95vw] md:w-[90vw] max-w-6xl h-[70vh] bg-black/20 backdrop-blur-xl border border-white/10 rounded-[1rem] overflow-hidden shadow-[0_0_50px_rgba(255,255,255,0.01)]">
 
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-30 pointer-events-none mix-blend-screen" />
 
@@ -207,19 +207,22 @@ export const Capabilities = () => {
           <div
             key={i}
             ref={(el) => { nodesRef.current[i] = el!; }}
-            className="absolute top-0 left-0 flex items-center justify-center w-[200px] h-[200px] pointer-events-auto cursor-crosshair"
+            className="absolute top-0 left-0 flex items-center justify-center w-[120px] h-[120px] md:w-[200px] md:h-[200px] pointer-events-auto cursor-crosshair"
             style={{ transform: "translate(-50%, -50%)" }}
             onMouseDown={() => handleChargeStart(i)}
             onMouseUp={(e) => handleChargeRelease(e, i)}
-            onMouseLeave={(e) => handleChargeRelease(e, i)} // Vystřelí, pokud s myší ujedeš mimo bublinu
+            onMouseLeave={(e) => handleChargeRelease(e, i)}
+            onTouchStart={() => handleChargeStart(i)}
+            onTouchEnd={(e) => handleChargeRelease(e, i)}
           >
             <div ref={(el) => { innerNodesRef.current[i] = el!; }} className="relative w-full h-full flex items-center justify-center">
               <div
                 ref={(el) => { ringRefs.current[i] = el!; }}
                 className="absolute w-full h-full rounded-full border border-white/10 border-t-white/40 border-b-white/5 mix-blend-overlay will-change-transform transition-colors duration-300"
               />
-              <div className="absolute px-5 py-2.5 bg-black/80 backdrop-blur-md rounded-full border border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.05)] pointer-events-none">
-                <span className="font-syne font-bold text-[10px] md:text-[11px] tracking-[0.2em] uppercase text-white whitespace-nowrap">
+              {/* OPRAVA: padding a velikost textu se mění s mobilem */}
+              <div className="absolute px-3 py-1.5 md:px-5 md:py-2.5 bg-black/80 backdrop-blur-md rounded-full border border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.05)] pointer-events-none">
+                <span className="font-syne font-bold text-[8px] md:text-[11px] tracking-[0.1em] md:tracking-[0.2em] uppercase text-white whitespace-nowrap">
                   {skill}
                 </span>
               </div>

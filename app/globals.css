@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+html, body {
+  overflow-x: hidden; /* Zakáže posouvání do stran (horizontal scroll) */
+  width: 100%;
+  position: relative;
+}
+
 @layer base {
   body {
     -webkit-font-smoothing: subpixel-antialiased;

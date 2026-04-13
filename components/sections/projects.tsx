@@ -42,20 +42,24 @@ export const Projects = () => {
 
   return (
     <section ref={sectionRef} id="work" className="relative w-full h-screen bg-transparent overflow-hidden">
-      <div ref={trackRef} className="flex h-full items-center px-[10vw] gap-[15vw] will-change-transform">
+      {/* OPRAVA: Dynamický padding a gap pro mobil vs desktop */}
+      <div ref={trackRef} className="flex h-full items-center px-[5vw] md:px-[10vw] gap-[10vw] md:gap-[15vw] will-change-transform">
         
-        <div className="flex-shrink-0 w-[40vw]">
+        {/* OPRAVA: w-[80vw] na mobilu, w-[40vw] na desktopu */}
+        <div className="flex-shrink-0 w-[80vw] md:w-[40vw]">
           <span className="font-mono text-[10px] tracking-[0.5em] text-white/40 uppercase block mb-6">02 // Selected Work</span>
-          <h2 className="font-syne font-black text-7xl md:text-9xl uppercase tracking-tighter leading-[0.8] text-white">
+          <h2 className="font-syne font-black text-6xl md:text-9xl uppercase tracking-tighter leading-[0.8] text-white">
             Proven <br /> <span className="font-instrument italic font-light lowercase">Systems.</span>
           </h2>
         </div>
 
+        {/* OPRAVA: Karta je širší na mobilu (85vw) a trochu nižší */}
         {projectsData.map((p) => (
-          <Link key={p.id} href={`/work/${p.slug}`} className="group relative w-[70vw] md:w-[50vw] h-[65vh] flex-shrink-0 cursor-pointer block">
+          <Link key={p.id} href={`/work/${p.slug}`} className="group relative w-[85vw] md:w-[50vw] h-[60vh] md:h-[65vh] flex-shrink-0 cursor-pointer block">
             
-            <div className="absolute -top-12 left-0 z-20 mix-blend-difference pointer-events-none transition-transform duration-700 group-hover:-translate-y-4">
-              <h3 className="font-syne font-black text-6xl md:text-8xl lg:text-9xl uppercase tracking-tighter text-white opacity-80 group-hover:opacity-100 transition-opacity">
+            <div className="absolute -top-8 md:-top-12 left-0 z-20 mix-blend-difference pointer-events-none transition-transform duration-700 group-hover:-translate-y-4">
+              {/* OPRAVA: Zmenšení nadpisu na mobilu (text-4xl sm:text-6xl) */}
+              <h3 className="font-syne font-black text-4xl sm:text-6xl md:text-8xl lg:text-9xl uppercase tracking-tighter text-white opacity-80 group-hover:opacity-100 transition-opacity">
                 {p.title}
               </h3>
             </div>
@@ -64,18 +68,17 @@ export const Projects = () => {
               className="relative w-full h-full overflow-hidden rounded-[2rem] border border-white/10"
               style={{ backgroundColor: p.brandColor }}
             >
-              {/* OPRAVA: bg-[length:100%_auto] zaručí, že obrázek není přiblížený. bg-bottom na hover vytvoří krásný scroll efekt. */}
               <div 
-                className="absolute top-0 left-0 w-full h-full bg-[length:100%_auto] bg-top transition-all duration-[10s] ease-linear] group-hover:bg-bottom"
+                className="absolute top-0 left-0 w-full h-full bg-[length:100%_auto] bg-top transition-all duration-[10s] ease-linear group-hover:bg-bottom"
                 style={{ backgroundImage: `url('${p.image}')` }}
               />
               
               <div className="absolute inset-0 bg-black/60 group-hover:bg-black/10 transition-colors duration-700 z-10" />
               
-              <div className="absolute bottom-8 left-8 right-8 z-20 flex justify-between items-end transform transition-transform duration-700 group-hover:translate-y-[-5px]">
+              <div className="absolute bottom-6 md:bottom-8 left-6 md:left-8 right-6 md:right-8 z-20 flex justify-between items-end transform transition-transform duration-700 group-hover:translate-y-[-5px]">
                 <div className="flex flex-col">
-                  <span className="font-mono text-[10px] tracking-widest uppercase text-white/60 mb-2">{p.id} // {p.role}</span>
-                  <span className="font-instrument italic text-xl text-white opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">
+                  <span className="font-mono text-[9px] md:text-[10px] tracking-widest uppercase text-white/60 mb-2">{p.id} // {p.role}</span>
+                  <span className="font-instrument italic text-lg md:text-xl text-white opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">
                     View Case Study
                   </span>
                 </div>
