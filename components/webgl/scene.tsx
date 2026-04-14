@@ -5,10 +5,10 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useLenis } from "lenis/react";
 import gsap from "gsap";
-// [ ! ] IMPORT TVÉHO HOOKU
 import { useMobile } from "@/hooks/use-mobile";
 
-const LiquidObsidianMaterial = () => {
+// [ ! ] OPRAVA 1: Komponenta nyní přijímá informaci o tom, zda je na mobilu
+const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const lenis = useLenis();
   const targetMouse = useRef(new THREE.Vector2(0, 0));
@@ -55,17 +55,21 @@ const LiquidObsidianMaterial = () => {
     handleResize();
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("resize", handleResize);
     window.addEventListener("webgl-shoot", handleShootEvent);
+    
+    // [ ! ] OPRAVA 2: Sledování myši běží JEN na desktopu. Mobil to ignoruje.
+    if (!isMobile) {
+      window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    }
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("webgl-shoot", handleShootEvent);
+      if (!isMobile) window.removeEventListener("mousemove", handleMouseMove);
     };
-  }, []);
+  }, [isMobile]);
 
   const uniforms = useMemo(() => ({
     uTime: { value: 0 },
@@ -82,7 +86,8 @@ const LiquidObsidianMaterial = () => {
 
   const vertexShader = `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position, 1.0); }`;
 
-  const fragmentShader = `
+  // [ ! ] OPRAVA 3: Shader generujeme dynamicky. Na mobilu srazíme zátěž matematické smyčky o 60 %.
+  const fragmentShader = useMemo(() => `
     uniform float uTime;
     uniform vec2 uResolution;
     uniform vec2 uMouse;
@@ -127,7 +132,11 @@ const LiquidObsidianMaterial = () => {
       p.y -= uScrollVelocity * 0.2;
       p *= 1.5;
 
-      for(int i = 1; i < 6; i++) { 
+      // [ ! ] OPRAVA 3 ZDE: Na mobilu běží jen 2x, na PC 5x
+      int maxIterations = ${isMobile ? 2 : 5};
+      
+      for(int i = 1; i <= 5; i++) { 
+        if (i > maxIterations) break;
         vec2 newp = p;
         float fi = float(i);
         float phase = uTime * 0.3 + mousePower * 2.0; 
@@ -163,13 +172,18 @@ const LiquidObsidianMaterial = () => {
 
       gl_FragColor = vec4(finalCol, 1.0);
     }
-  `;
+  `, [isMobile]);
 
   useFrame((state) => {
     if (!materialRef.current) return;
     const mats = materialRef.current.uniforms;
     mats.uTime.value = state.clock.elapsedTime;
-    mats.uMouse.value.lerp(targetMouse.current, 0.1); 
+    
+    // Na mobilu targetMouse neaktualizujeme, interpolace běží do nulového bodu (ušetříme CPU cykly)
+    if (!isMobile) {
+      mats.uMouse.value.lerp(targetMouse.current, 0.1); 
+    }
+    
     scrollData.current.velocity *= 0.9;
     mats.uScrollVelocity.value = THREE.MathUtils.lerp(mats.uScrollVelocity.value, scrollData.current.velocity, 0.1);
     mats.uScrollProgress.value = scrollData.current.progress;
@@ -179,7 +193,6 @@ const LiquidObsidianMaterial = () => {
 };
 
 export const WebGLScene = () => {
-  // [ ! ] ZAVOLÁME HOOK
   const isMobile = useMobile();
 
   return (
@@ -187,13 +200,14 @@ export const WebGLScene = () => {
       <Canvas 
         orthographic 
         camera={{ position: [0, 0, 1], left: -1, right: 1, top: 1, bottom: -1 }} 
-        // [ ! ] TADY JE TA MAGIE: Mobil počítá jen 75% pixelů, desktop jede bomby na 100-200%
-        dpr={isMobile ? 0.75 : [1, 2]} 
-        gl={{ powerPreference: "high-performance", alpha: false, antialias: false }}
+        // [ ! ] OPRAVA 4: DPR na mobilu sraženo na 0.4. V kombinaci s ušetřenou smyčkou v shaderu získáme neskutečný boost výkonu.
+        dpr={isMobile ? 0.4 : [1, 1.5]} 
+        // [ ! ] OPRAVA 5: Vypínáme hloubkové buffery, které pro 2D plátno absolutně nepotřebujeme (šetříme RAM a VRAM)
+        gl={{ powerPreference: "high-performance", alpha: false, antialias: false, stencil: false, depth: false }}
       >
         <mesh>
           <planeGeometry args={[2, 2]} />
-          <LiquidObsidianMaterial />
+          <LiquidObsidianMaterial isMobile={isMobile} />
         </mesh>
       </Canvas>
     </div>

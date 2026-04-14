@@ -5,6 +5,7 @@ import { LenisProvider } from "@/components/providers/lenis-provider";
 import { Cursor } from "@/components/ui/cursor";
 import { Grain } from "@/components/ui/grain";
 import { LanguageProvider } from "@/components/navigation/language-toggle";
+import { Preloader } from "@/components/ui/preloader";
 
 const syne = Syne({ subsets: ["latin"], weight: ["400", "700", "800"], variable: "--font-syne" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
@@ -26,18 +27,18 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // [ ! ] Přidáno overflow-x-hidden
     <html lang="en" className={`${syne.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} no-scrollbar overflow-x-hidden`}>
-      {/* [ ! ] Přidáno overflow-x-hidden, w-full a relative */}
       <body suppressHydrationWarning className="bg-background text-foreground font-sans antialiased cursor-none overflow-x-hidden w-full relative">
         
+        {/* [ ! ] PRELOADER ÚPLNĚ NAHOŘE */}
+        <Preloader />
+
         <LanguageProvider>
           <LenisProvider>
             {children}
           </LenisProvider>
         </LanguageProvider>
         
-        {/* Globální UI elementy */}
         <Cursor />
         <Grain /> 
       </body>

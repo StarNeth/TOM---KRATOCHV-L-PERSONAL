@@ -33,17 +33,6 @@ export const Hero = () => {
   const content = DICTIONARY[language];
 
   useGSAP(() => {
-    const tl = gsap.timeline({ delay: 0.1 });
-
-    tl.fromTo(nameRef.current,
-      { y: 40, opacity: 0, filter: "blur(10px)" },
-      { y: 0, opacity: 1, filter: "blur(0px)", duration: 1.5, ease: "power3.out" }
-    ).fromTo(".hero-ui",
-      { opacity: 0, y: 10 },
-      { opacity: 1, y: 0, duration: 1, ease: "power3.out", stagger: 0.15 },
-      "-=0.8"
-    );
-
     const xTo = gsap.quickTo(nameRef.current, "x", { duration: 1.5, ease: "power3.out" });
     const yTo = gsap.quickTo(nameRef.current, "y", { duration: 1.5, ease: "power3.out" });
 
@@ -53,9 +42,9 @@ export const Hero = () => {
       xTo(xRatio * 40);
       yTo(yRatio * 40);
     };
-
     window.addEventListener("mousemove", handleMouseMove);
 
+    // Animace parallaxu pro scroll zůstává
     gsap.to(containerRef.current, {
       yPercent: 20,
       opacity: 0,
@@ -68,7 +57,33 @@ export const Hero = () => {
       }
     });
 
-    return () => window.removeEventListener("mousemove", handleMouseMove);
+    // [ ! ] ZMĚNA: Úvodní animace čeká na signál z Preloaderu!
+    const playIntroAnimation = () => {
+      const tl = gsap.timeline();
+      
+      tl.fromTo(nameRef.current,
+        { y: 40, opacity: 0, filter: "blur(10px)" },
+        { y: 0, opacity: 1, filter: "blur(0px)", duration: 1.5, ease: "power3.out" }
+      );
+
+      // [ ! ] OPRAVA: Zabrání GSAP chybě v terminálu (ověří, že prvky před animací existují)
+      const heroUiElements = document.querySelectorAll(".hero-ui");
+      if (heroUiElements.length > 0) {
+        tl.fromTo(heroUiElements,
+          { opacity: 0, y: 10 },
+          { opacity: 1, y: 0, duration: 1, ease: "power3.out", stagger: 0.15 },
+          "-=0.8"
+        );
+      }
+    };
+
+    // Posloucháme na náš CustomEvent
+    window.addEventListener("preloader-complete", playIntroAnimation);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("preloader-complete", playIntroAnimation);
+    };
   }, { scope: containerRef });
 
   return (

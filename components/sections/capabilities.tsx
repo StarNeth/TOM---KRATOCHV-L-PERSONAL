@@ -70,7 +70,7 @@ export const Capabilities = () => {
     return () => clearInterval(matrixInterval);
   }, []);
 
-  // === FYZIKA KOLOZÍ ===
+  // === FYZIKA KOLOZÍ (OPTIMALIZOVÁNO) ===
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -81,56 +81,83 @@ export const Capabilities = () => {
 
     let animationFrameId: number;
     const friction = 0.94;
+    
+    // [ ! ] ZÁMEK: Bude true pouze, když na sekci uživatel reálně kouká
+    let isVisible = false;
+
+    // ScrollTrigger nám řekne, jestli je sekce na obrazovce
+    ScrollTrigger.create({
+      trigger: sectionRef.current,
+      start: "top bottom", // Jakmile horní okraj sekce vstoupí zespodu na obrazovku
+      end: "bottom top",   // Až dokud spodní okraj nezmizí nahoře
+      onToggle: (self) => {
+        isVisible = self.isActive;
+      }
+    });
 
     const updatePhysics = () => {
-      const { width, height } = container.getBoundingClientRect();
-      const nodes = physicsState.current;
+      // ZDE JE TA MAGIE: Pokud sekci nevidíme, nepřepočítáváme těžkou matematiku
+      if (isVisible) {
+        const { width, height } = container.getBoundingClientRect();
+        const nodes = physicsState.current;
 
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const n1 = nodes[i]; const n2 = nodes[j];
-          const dx = n2.x - n1.x; const dy = n2.y - n1.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const n1 = nodes[i]; const n2 = nodes[j];
+            const dx = n2.x - n1.x; const dy = n2.y - n1.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
 
-          if (dist < collisionRadius && dist > 0) {
-            const overlap = collisionRadius - dist;
-            const nx = dx / dist; const ny = dy / dist;
-            n1.x -= (nx * overlap) * 0.5; n1.y -= (ny * overlap) * 0.5;
-            n2.x += (nx * overlap) * 0.5; n2.y += (ny * overlap) * 0.5;
-            const kx = n1.vx - n2.vx; const ky = n1.vy - n2.vy;
-            const p = (nx * kx + ny * ky) * 0.8;
-            n1.vx -= p * nx; n1.vy -= p * ny;
-            n2.vx += p * nx; n2.vy += p * ny;
+            if (dist < collisionRadius && dist > 0) {
+              const overlap = collisionRadius - dist;
+              const nx = dx / dist; const ny = dy / dist;
+              n1.x -= (nx * overlap) * 0.5; n1.y -= (ny * overlap) * 0.5;
+              n2.x += (nx * overlap) * 0.5; n2.y += (ny * overlap) * 0.5;
+              const kx = n1.vx - n2.vx; const ky = n1.vy - n2.vy;
+              const p = (nx * kx + ny * ky) * 0.8;
+              n1.vx -= p * nx; n1.vy -= p * ny;
+              n2.vx += p * nx; n2.vy += p * ny;
+            }
           }
         }
+
+        nodes.forEach((node, i) => {
+          const el = nodesRef.current[i];
+          const ring = ringRefs.current[i];
+          if (!el || !ring) return;
+
+          node.vx *= friction; node.vy *= friction;
+          node.vx += (Math.random() - 0.5) * 0.2;
+          node.vy += (Math.random() - 0.5) * 0.2;
+          node.x += node.vx; node.y += node.vy;
+
+          if (node.x < boundaryPadding) { node.x = boundaryPadding; node.vx *= -1; }
+          if (node.x > width - boundaryPadding) { node.x = width - boundaryPadding; node.vx *= -1; }
+          if (node.y < boundaryPadding) { node.y = boundaryPadding; node.vy *= -1; }
+          if (node.y > height - boundaryPadding) { node.y = height - boundaryPadding; node.vy *= -1; }
+
+          node.rotSpeed = gsap.utils.interpolate(node.rotSpeed, 0.5, 0.02);
+          node.rotation += node.rotSpeed;
+
+          // will-change-transform už bys měl mít v CSS třídě u těch ringů, GSAP .set to přesune přes GPU
+          gsap.set(el, { x: node.x, y: node.y });
+          gsap.set(ring, { rotation: node.rotation });
+        });
       }
-
-      nodes.forEach((node, i) => {
-        const el = nodesRef.current[i];
-        const ring = ringRefs.current[i];
-        if (!el || !ring) return;
-
-        node.vx *= friction; node.vy *= friction;
-        node.vx += (Math.random() - 0.5) * 0.2;
-        node.vy += (Math.random() - 0.5) * 0.2;
-        node.x += node.vx; node.y += node.vy;
-
-        if (node.x < boundaryPadding) { node.x = boundaryPadding; node.vx *= -1; }
-        if (node.x > width - boundaryPadding) { node.x = width - boundaryPadding; node.vx *= -1; }
-        if (node.y < boundaryPadding) { node.y = boundaryPadding; node.vy *= -1; }
-        if (node.y > height - boundaryPadding) { node.y = height - boundaryPadding; node.vy *= -1; }
-
-        node.rotSpeed = gsap.utils.interpolate(node.rotSpeed, 0.5, 0.02);
-        node.rotation += node.rotSpeed;
-
-        gsap.set(el, { x: node.x, y: node.y });
-        gsap.set(ring, { rotation: node.rotation });
-      });
+      
+      // RequestAnimationFrame voláme pořád, ale "prázdně" - žere 0 % CPU
       animationFrameId = requestAnimationFrame(updatePhysics);
     };
+    
     updatePhysics();
 
-    gsap.fromTo(".cap-title", { opacity: 0, y: 50 }, { opacity: 1, y: 0, duration: 1, ease: "power4.out", scrollTrigger: { trigger: sectionRef.current, start: "top 60%" } });
+    // Oprava varování v terminálu - animujeme přes bezpečný ref, ne přes className
+    const titleEl = sectionRef.current?.querySelector('.cap-title');
+    if (titleEl) {
+      gsap.fromTo(titleEl, 
+        { opacity: 0, y: 50 }, 
+        { opacity: 1, y: 0, duration: 1, ease: "power4.out", scrollTrigger: { trigger: sectionRef.current, start: "top 60%" } }
+      );
+    }
 
     return () => cancelAnimationFrame(animationFrameId);
   }, []);
