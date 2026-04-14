@@ -77,11 +77,15 @@ export const Hero = () => {
 
       <h1 
         ref={nameRef}
-        // Na mobilu text-5xl, na desktopu ten tvůj původní obří clamp
-        className="relative text-5xl md:text-[clamp(2.5rem,8.5vw,10rem)] font-sans font-black tracking-tighter leading-[0.9] uppercase text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.15)] text-center will-change-transform break-words w-full"
+        // OPRAVA: flex-col pro jistotu a whitespace-nowrap, aby se to NIKDY nerozdělilo
+        className="relative font-sans font-black tracking-tighter leading-[0.85] uppercase text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.15)] text-center will-change-transform w-full flex flex-col items-center"
       >
-        <span className="block">TOMÁŠ</span>
-        <span className="block text-white/90">KRATOCHVÍL</span>
+        <span className="block text-[clamp(3.5rem,14vw,6rem)] md:text-[clamp(5rem,8.5vw,10rem)] whitespace-nowrap">
+          TOMÁŠ
+        </span>
+        <span className="block text-[clamp(3.5rem,13vw,6rem)] md:text-[clamp(5rem,8.5vw,10rem)] text-white/90 whitespace-nowrap">
+          KRATOCHVÍL
+        </span>
       </h1>
 
         <div className="hero-ui h-px bg-gradient-to-r from-transparent via-white/50 to-transparent mt-12 w-[120px]" />
