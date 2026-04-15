@@ -6,7 +6,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
-const skillsData = [
+const skillsData =[
   "AI WEB ARCHITECT", "UI/UX ENGINEERING", "FRONTEND SYSTEMS",
   "CREATIVE DEVELOPMENT", "WEBGL / 3D EXPERIENCES", "OSINT & SEC-OPS",
   "PROMPT ENGINEERING", "REACT / NEXT.JS"
@@ -47,43 +47,19 @@ export const Capabilities = () => {
     const columns = canvas.width / fontSize;
     const drops = Array(Math.floor(columns)).fill(1);
 
-    const drawMatrix = () => {
-      if (!isMatrixActive.current) return; 
-      
-      ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#ff2a00"; 
-      ctx.font = `${fontSize}px monospace`;
-
-      for (let i = 0; i < drops.length; i++) {
-        const text = Math.random() > 0.5 ? "1" : "0";
-        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-        if (drops[i] * fontSize > canvas.height && Math.random() > 0.95) drops[i] = 0;
-        drops[i]++;
-      }
-    };
-
-    const matrixInterval = setInterval(drawMatrix, 50);
-    return () => clearInterval(matrixInterval);
-  }, []);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
     const isMobile = window.innerWidth < 768;
     const collisionRadius = isMobile ? 110 : 200;
     const boundaryPadding = isMobile ? 40 : 80;
 
     let animationFrameId: number;
     const friction = 0.94;
-    
-    // [ ! ] ZMĚNĚNO: Visibility Culling - vypne výpočty fyziky, když nejsi v sekci
     let isVisible = false;
+    let lastMatrixDraw = 0;
 
-    const updatePhysics = () => {
-      if (!isVisible) return; // ZMĚNĚNO: Úplně zastaví smyčku, pokud sekci nevidíme (0% zátěž CPU)
-      
+    const renderLoop = (timestamp: number) => {
+      if (!isVisible) return; 
+
+      // 1. PHYSICS UPDATE
       const { width, height } = container.getBoundingClientRect();
       const nodes = physicsState.current;
 
@@ -128,10 +104,25 @@ export const Capabilities = () => {
         gsap.set(ring, { rotation: node.rotation });
       });
 
-      animationFrameId = requestAnimationFrame(updatePhysics);
+      // 2. MATRIX UPDATE (Throttled to ~50ms)
+      if (isMatrixActive.current && timestamp - lastMatrixDraw > 50) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#ff2a00"; 
+        ctx.font = `${fontSize}px monospace`;
+
+        for (let i = 0; i < drops.length; i++) {
+          const text = Math.random() > 0.5 ? "1" : "0";
+          ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+          if (drops[i] * fontSize > canvas.height && Math.random() > 0.95) drops[i] = 0;
+          drops[i]++;
+        }
+        lastMatrixDraw = timestamp;
+      }
+
+      animationFrameId = requestAnimationFrame(renderLoop);
     };
     
-    // ZMĚNĚNO: Zapojíme smyčku přímo do ScrollTriggeru. Zapne se, jen když je sekce vidět.
     ScrollTrigger.create({
       trigger: sectionRef.current,
       start: "top bottom", 
@@ -139,14 +130,12 @@ export const Capabilities = () => {
       onToggle: (self) => { 
         isVisible = self.isActive;
         if (isVisible) {
-          updatePhysics(); // Nastartuje motor
+          animationFrameId = requestAnimationFrame(renderLoop);
         } else {
-          cancelAnimationFrame(animationFrameId); // Zhasne motor
+          cancelAnimationFrame(animationFrameId);
         }
       }
     });
-    
-    updatePhysics();
 
     const titleEl = sectionRef.current?.querySelector('.cap-title');
     if (titleEl) {
@@ -157,11 +146,10 @@ export const Capabilities = () => {
     }
 
     return () => cancelAnimationFrame(animationFrameId);
-  }, []);
+  },[]);
 
   const handleChargeStart = (index: number) => {
     isCharging.current[index] = true;
-    
     isMatrixActive.current = true;
     if (canvasRef.current) {
       gsap.to(canvasRef.current, { opacity: 0.2, duration: 0.5, ease: "power2.out", filter: "brightness(1)" });
@@ -226,8 +214,7 @@ export const Capabilities = () => {
     <section ref={sectionRef} id="capabilities" className="relative w-full h-[120vh] z-10 text-white flex flex-col items-center justify-center pt-24 pb-32 overflow-hidden">
       <div className="cap-title flex flex-col items-center mb-8 md:mb-12 mix-blend-difference pointer-events-none px-4 text-center w-full max-w-[100vw]">
         <h2 className="font-syne font-bold text-4xl md:text-8xl uppercase tracking-tighter">Architecture</h2>
-        <p className="font-mono text-[8px] md:text-xs tracking-[0.2em] md:tracking-[0.3em] uppercase text-white/50 mt-4 max-w-[80vw]">
-          [ Containment Field ] — Hold node to charge. Release to fire.
+        <p className="font-mono text-[8px] md:text-xs tracking-[0.2em] md:tracking-[0.3em] uppercase text-white/50 mt-4 max-w-[80vw]">[ Containment Field ] — Hold node to charge. Release to fire.
         </p>
       </div>
 

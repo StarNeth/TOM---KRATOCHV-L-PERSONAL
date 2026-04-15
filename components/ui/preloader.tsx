@@ -23,13 +23,20 @@ export const Preloader = () => {
       }
     });
 
-    // ČISTÁ FILMOVÁ ANIMACE BEZ CHYB HYDRATACE A TĚŽKÉHO BLURU
     tl.to(textRef.current, { opacity: 0, scale: 1.05, duration: 0.8, ease: "power2.inOut", delay: 0.5 })
       .call(() => setText("ahoj.")) 
       .to(textRef.current, { opacity: 1, scale: 1, duration: 0.8, ease: "power2.out" })
       .to(textRef.current, { opacity: 0, scale: 0.95, duration: 0.8, ease: "power2.inOut", delay: 0.4 })
       .to(glowRef.current, { opacity: 0, duration: 0.5 }, "<")
-      .to(containerRef.current, { opacity: 0, duration: 1.5, ease: "power3.inOut" });
+      .to(containerRef.current, { 
+        opacity: 0, 
+        duration: 1.5, 
+        ease: "power3.inOut",
+        onStart: () => {
+          // Cinematic Handshake: Tell Hero to start animating
+          window.dispatchEvent(new CustomEvent("preloader-hide-start"));
+        }
+      });
 
   }, { scope: containerRef });
 

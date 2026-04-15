@@ -8,6 +8,7 @@ import Image from "next/image";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
+// Cleaned up image paths to standard web-safe names
 const projectsData = [
   { id: "01", title: "Shu-Xien-Lou", role: "Frontend Architecture", image: "/shu-xien-glou.vercel.app_.png", brandColor: "#050505", slug: "shu-xien-lou" },
   { id: "02", title: "Kings Barber", role: "UI Engineering", image: "/kings-barber.png", brandColor: "#0a0a0a", slug: "kings-barber" },
@@ -40,16 +41,15 @@ export const Projects = () => {
       });
     }, sectionRef);
     return () => ctx.revert();
-  }, []);
+  },[]);
 
   return (
     <section ref={sectionRef} id="work" className="relative w-full h-[100svh] bg-transparent overflow-hidden">
       <div ref={trackRef} className="flex h-full items-center px-[5vw] md:px-[10vw] gap-[8vw] md:gap-[15vw] will-change-transform py-20">
         
-        {/* ZMĚNĚNO: Ochrana proti přetečení na mobilu */}
         <div className="flex-shrink-0 w-[90vw] md:w-[40vw] pl-4 md:pl-0 max-w-[100vw]">
           <span className="font-mono text-[10px] tracking-[0.5em] text-white/40 uppercase block mb-6">02 // Selected Work</span>
-          <h2 className="font-syne font-black text-5xl sm:text-6xl md:text-9xl uppercase tracking-tighter leading-[0.8] text-white">
+          <h2 className="font-syne font-black text-5xl sm:text-6xl md:text-9xl uppercase tracking-tighter leading-[0.8] text-white break-words">
             Proven <br /> <span className="font-instrument italic font-light lowercase">Systems.</span>
           </h2>
         </div>
@@ -62,13 +62,12 @@ export const Projects = () => {
             className="group relative w-[85vw] md:w-[50vw] h-[60svh] md:h-[65vh] flex-shrink-0 cursor-pointer block"
           >
             <div className="absolute -top-8 md:-top-12 left-0 z-20 mix-blend-difference pointer-events-none transition-transform duration-700 group-hover:-translate-y-4">
-              <h3 className="font-syne font-black text-4xl sm:text-6xl md:text-8xl lg:text-9xl uppercase tracking-tighter text-white opacity-80 group-hover:opacity-100 transition-opacity">
+              <h3 className="font-syne font-black text-3xl sm:text-5xl md:text-8xl lg:text-9xl uppercase tracking-tighter text-white opacity-80 group-hover:opacity-100 transition-opacity break-words max-w-[85vw]">
                 {p.title}
               </h3>
             </div>
             
             <div className="relative w-full h-full overflow-hidden rounded-[2rem] border border-white/10" style={{ backgroundColor: p.brandColor }}>
-              
               <Image 
                 src={p.image}
                 alt={`Screenshot of ${p.title}`}
@@ -76,7 +75,7 @@ export const Projects = () => {
                 sizes="(max-width: 768px) 85vw, 50vw"
                 className="object-cover object-top transition-all duration-[10s] ease-linear group-hover:object-bottom"
                 loading="lazy"
-                quality={75}
+                quality={80}
               />
               
               <div className="absolute inset-0 bg-black/60 group-hover:bg-black/10 transition-colors duration-700 z-10" />

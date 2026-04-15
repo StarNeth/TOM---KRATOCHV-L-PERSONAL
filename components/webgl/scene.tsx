@@ -7,7 +7,6 @@ import { useLenis } from "lenis/react";
 import gsap from "gsap";
 import { useMobile } from "@/hooks/use-mobile";
 
-// [ ! ] OPRAVA 1: Komponenta nyní přijímá informaci o tom, zda je na mobilu
 const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const lenis = useLenis();
@@ -16,6 +15,11 @@ const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
 
   useEffect(() => {
     let lastY = window.scrollY;
+    
+    // Fix Hydration mismatch by setting initial resolution on mount
+    if (materialRef.current) {
+      materialRef.current.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+    }
     
     const handleScroll = () => {
       const currentY = window.scrollY;
@@ -52,13 +56,11 @@ const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
     };
 
     handleScroll();
-    handleResize();
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("resize", handleResize);
     window.addEventListener("webgl-shoot", handleShootEvent);
     
-    // [ ! ] OPRAVA 2: Sledování myši běží JEN na desktopu. Mobil to ignoruje.
     if (!isMobile) {
       window.addEventListener("mousemove", handleMouseMove, { passive: true });
     }
@@ -73,21 +75,20 @@ const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
 
   const uniforms = useMemo(() => ({
     uTime: { value: 0 },
-    uResolution: { value: new THREE.Vector2(
-      typeof window !== 'undefined' ? window.innerWidth : 1920, 
-      typeof window !== 'undefined' ? window.innerHeight : 1080
-    )},
+    uResolution: { value: new THREE.Vector2(1, 1) }, // Hydration safe
     uMouse: { value: new THREE.Vector2(0, 0) },
     uScrollVelocity: { value: 0 },
     uScrollProgress: { value: 0 },
     uClickPos: { value: new THREE.Vector2(0, 0) },
     uClickRipple: { value: 1.0 }, 
-  }), []);
+  }),[]);
 
   const vertexShader = `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position, 1.0); }`;
 
-  // [ ! ] OPRAVA 3: Shader generujeme dynamicky. Na mobilu srazíme zátěž matematické smyčky o 60 %.
+  // Adaptive Shader: Mobile uses 3 iterations, Desktop uses 5. Massive FPS gain.
   const fragmentShader = useMemo(() => `
+    #define ITERATIONS ${isMobile ? '3' : '5'}
+    
     uniform float uTime;
     uniform vec2 uResolution;
     uniform vec2 uMouse;
@@ -132,8 +133,7 @@ const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
       p.y -= uScrollVelocity * 0.2;
       p *= 1.5;
 
-      // ZMĚNĚNO: Vracíme plnou vizuální kvalitu smyčky pro SOTY efekt
-      for(int i = 1; i < 6; i++) {
+      for(int i = 1; i <= ITERATIONS; i++) {
         vec2 newp = p;
         float fi = float(i);
         float phase = uTime * 0.3 + mousePower * 2.0; 
@@ -176,7 +176,6 @@ const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
     const mats = materialRef.current.uniforms;
     mats.uTime.value = state.clock.elapsedTime;
     
-    // Na mobilu targetMouse neaktualizujeme, interpolace běží do nulového bodu (ušetříme CPU cykly)
     if (!isMobile) {
       mats.uMouse.value.lerp(targetMouse.current, 0.1); 
     }
@@ -196,10 +195,9 @@ export const WebGLScene = () => {
     <div className="fixed inset-0 w-full h-full z-0 pointer-events-none">
       <Canvas 
         orthographic 
-        camera={{ position: [0, 0, 1], left: -1, right: 1, top: 1, bottom: -1 }} 
-        // ZMĚNĚNO: DPR vráceno na rozumnou, mnohem hezčí hodnotu. Na mobilu 0.75 (vyhlazené, ale netrhá).
-        dpr={isMobile ? 0.75 : [1, 2]}
-        // [ ! ] OPRAVA 5: Vypínáme hloubkové buffery, které pro 2D plátno absolutně nepotřebujeme (šetříme RAM a VRAM)
+        camera={{ position:[0, 0, 1], left: -1, right: 1, top: 1, bottom: -1 }} 
+        // Clamped DPR for extreme mobile performance
+        dpr={isMobile ? 0.75 :[1, 1.5]}
         gl={{ powerPreference: "high-performance", alpha: false, antialias: false, stencil: false, depth: false }}
       >
         <mesh>
