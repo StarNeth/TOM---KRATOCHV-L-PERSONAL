@@ -132,11 +132,8 @@ const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
       p.y -= uScrollVelocity * 0.2;
       p *= 1.5;
 
-      // [ ! ] OPRAVA 3 ZDE: Na mobilu běží jen 2x, na PC 5x
-      int maxIterations = ${isMobile ? 2 : 5};
-      
-      for(int i = 1; i <= 5; i++) { 
-        if (i > maxIterations) break;
+      // ZMĚNĚNO: Vracíme plnou vizuální kvalitu smyčky pro SOTY efekt
+      for(int i = 1; i < 6; i++) {
         vec2 newp = p;
         float fi = float(i);
         float phase = uTime * 0.3 + mousePower * 2.0; 
@@ -200,8 +197,8 @@ export const WebGLScene = () => {
       <Canvas 
         orthographic 
         camera={{ position: [0, 0, 1], left: -1, right: 1, top: 1, bottom: -1 }} 
-        // [ ! ] OPRAVA 4: DPR na mobilu sraženo na 0.4. V kombinaci s ušetřenou smyčkou v shaderu získáme neskutečný boost výkonu.
-        dpr={isMobile ? 0.4 : [1, 1.5]} 
+        // ZMĚNĚNO: DPR vráceno na rozumnou, mnohem hezčí hodnotu. Na mobilu 0.75 (vyhlazené, ale netrhá).
+        dpr={isMobile ? 0.75 : [1, 2]}
         // [ ! ] OPRAVA 5: Vypínáme hloubkové buffery, které pro 2D plátno absolutně nepotřebujeme (šetříme RAM a VRAM)
         gl={{ powerPreference: "high-performance", alpha: false, antialias: false, stencil: false, depth: false }}
       >

@@ -8,7 +8,6 @@ import Image from "next/image";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
-// [ ! ] OPRAVA: Odstraněna vlastnost "video" - používáme striktně pouze optimalizované fotky.
 const projectsData = [
   { id: "01", title: "Shu-Xien-Lou", role: "Frontend Architecture", image: "/shu-xien-glou.vercel.app_.png", brandColor: "#050505", slug: "shu-xien-lou" },
   { id: "02", title: "Kings Barber", role: "UI Engineering", image: "/kings-barber.png", brandColor: "#0a0a0a", slug: "kings-barber" },
@@ -47,9 +46,10 @@ export const Projects = () => {
     <section ref={sectionRef} id="work" className="relative w-full h-[100svh] bg-transparent overflow-hidden">
       <div ref={trackRef} className="flex h-full items-center px-[5vw] md:px-[10vw] gap-[8vw] md:gap-[15vw] will-change-transform py-20">
         
-        <div className="flex-shrink-0 w-[90vw] md:w-[40vw] pl-4 md:pl-0">
+        {/* ZMĚNĚNO: Ochrana proti přetečení na mobilu */}
+        <div className="flex-shrink-0 w-[90vw] md:w-[40vw] pl-4 md:pl-0 max-w-[100vw]">
           <span className="font-mono text-[10px] tracking-[0.5em] text-white/40 uppercase block mb-6">02 // Selected Work</span>
-          <h2 className="font-syne font-black text-6xl md:text-9xl uppercase tracking-tighter leading-[0.8] text-white">
+          <h2 className="font-syne font-black text-5xl sm:text-6xl md:text-9xl uppercase tracking-tighter leading-[0.8] text-white">
             Proven <br /> <span className="font-instrument italic font-light lowercase">Systems.</span>
           </h2>
         </div>

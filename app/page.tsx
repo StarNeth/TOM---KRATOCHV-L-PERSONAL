@@ -18,28 +18,22 @@ export default function Home() {
   const [mountWebGL, setMountedWebGL] = useState(false);
 
   useEffect(() => {
-    // SOTY OPTIMALIZACE PRO 100/100:
-    // WebGL se spustí AŽ KDYŽ uživatel udělá první akci. 
-    const handleInteraction = () => {
-      setMountedWebGL(true);
-      window.removeEventListener("scroll", handleInteraction);
-      window.removeEventListener("touchstart", handleInteraction);
-      window.removeEventListener("mousemove", handleInteraction);
+    // ZMĚNĚNO: Sekvenční zapalování (Sequential Ignition).
+    // Necháme grafickou kartu odpočinout během Preloaderu. 
+    // WebGL se začne kompilovat až ve chvíli, kdy Preloader skončí.
+    const handlePreloaderDone = () => {
+      // Dáme prohlížeči ještě 100ms volno na překreslení DOMu, pak nahodíme 3D
+      setTimeout(() => setMountedWebGL(true), 100);
     };
 
-    window.addEventListener("scroll", handleInteraction, { once: true, passive: true });
-    window.addEventListener("touchstart", handleInteraction, { once: true, passive: true });
-    window.addEventListener("mousemove", handleInteraction, { once: true, passive: true });
+    window.addEventListener("preloader-complete", handlePreloaderDone);
 
-    const fallbackTimer = setTimeout(() => {
-      handleInteraction();
-    }, 4000);
+    // Záchrana pro jistotu (kdyby event selhal)
+    const safetyTimer = setTimeout(() => setMountedWebGL(true), 4000);
 
     return () => {
-      window.removeEventListener("scroll", handleInteraction);
-      window.removeEventListener("touchstart", handleInteraction);
-      window.removeEventListener("mousemove", handleInteraction);
-      clearTimeout(fallbackTimer);
+      window.removeEventListener("preloader-complete", handlePreloaderDone);
+      clearTimeout(safetyTimer);
     };
   }, []);
 

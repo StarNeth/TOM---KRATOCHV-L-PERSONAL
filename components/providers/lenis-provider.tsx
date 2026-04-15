@@ -14,7 +14,6 @@ interface ScrollState {
   progress: number;
 }
 
-// Global store for WebGL - no React re-renders
 export const scrollStore: ScrollState = {
   scroll: 0,
   velocity: 0,
@@ -33,6 +32,7 @@ export function LenisProvider({ children }: { children: ReactNode }) {
   const [lenis, setLenis] = useState<Lenis | null>(null);
 
   useEffect(() => {
+    // ČISTÁ KONFIGURACE BEZ CHYBNÝCH TYPŮ
     const lenisInstance = new Lenis({
       duration: 1.4,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
@@ -45,7 +45,6 @@ export function LenisProvider({ children }: { children: ReactNode }) {
     lenisRef.current = lenisInstance;
     setLenis(lenisInstance);
 
-    // Scroll tracking
     let smoothedVelocity = 0;
 
     lenisInstance.on("scroll", ({ scroll, velocity, direction, progress }: ScrollState) => {
@@ -56,7 +55,6 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       scrollStore.progress = progress;
     });
 
-    // Connect to GSAP ScrollTrigger
     lenisInstance.on("scroll", ScrollTrigger.update);
 
     gsap.ticker.add((time) => {

@@ -22,7 +22,6 @@ export const Capabilities = () => {
   const ringRefs = useRef<HTMLDivElement[]>([]);
   const isCharging = useRef<boolean[]>(new Array(skillsData.length).fill(false));
   
-  // [ ! ] VÝKONNOSTNÍ ZÁMEK: Brání vykreslování Matrixu na pozadí
   const isMatrixActive = useRef<boolean>(false);
 
   const physicsState = useRef(
@@ -33,7 +32,6 @@ export const Capabilities = () => {
     }))
   );
 
-  // === MATRIX CANVAS (OPTIMALIZOVÁNO PRO BATERII A TBT) ===
   useEffect(() => {
     const container = containerRef.current;
     const canvas = canvasRef.current;
@@ -50,12 +48,11 @@ export const Capabilities = () => {
     const drops = Array(Math.floor(columns)).fill(1);
 
     const drawMatrix = () => {
-      // CPU ZÁCHRANA: Kód se ukončí a nekreslí, pokud není aktivovaný
       if (!isMatrixActive.current) return; 
       
       ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#ff2a00"; // Červená barva
+      ctx.fillStyle = "#ff2a00"; 
       ctx.font = `${fontSize}px monospace`;
 
       for (let i = 0; i < drops.length; i++) {
@@ -70,7 +67,6 @@ export const Capabilities = () => {
     return () => clearInterval(matrixInterval);
   }, []);
 
-  // === FYZIKA KOLOZÍ (OPTIMALIZOVÁNO) ===
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -82,75 +78,76 @@ export const Capabilities = () => {
     let animationFrameId: number;
     const friction = 0.94;
     
-    // [ ! ] ZÁMEK: Bude true pouze, když na sekci uživatel reálně kouká
+    // [ ! ] ZMĚNĚNO: Visibility Culling - vypne výpočty fyziky, když nejsi v sekci
     let isVisible = false;
 
-    // ScrollTrigger nám řekne, jestli je sekce na obrazovce
-    ScrollTrigger.create({
-      trigger: sectionRef.current,
-      start: "top bottom", // Jakmile horní okraj sekce vstoupí zespodu na obrazovku
-      end: "bottom top",   // Až dokud spodní okraj nezmizí nahoře
-      onToggle: (self) => {
-        isVisible = self.isActive;
-      }
-    });
-
     const updatePhysics = () => {
-      // ZDE JE TA MAGIE: Pokud sekci nevidíme, nepřepočítáváme těžkou matematiku
-      if (isVisible) {
-        const { width, height } = container.getBoundingClientRect();
-        const nodes = physicsState.current;
+      if (!isVisible) return; // ZMĚNĚNO: Úplně zastaví smyčku, pokud sekci nevidíme (0% zátěž CPU)
+      
+      const { width, height } = container.getBoundingClientRect();
+      const nodes = physicsState.current;
 
-        for (let i = 0; i < nodes.length; i++) {
-          for (let j = i + 1; j < nodes.length; j++) {
-            const n1 = nodes[i]; const n2 = nodes[j];
-            const dx = n2.x - n1.x; const dy = n2.y - n1.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const n1 = nodes[i]; const n2 = nodes[j];
+          const dx = n2.x - n1.x; const dy = n2.y - n1.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
 
-            if (dist < collisionRadius && dist > 0) {
-              const overlap = collisionRadius - dist;
-              const nx = dx / dist; const ny = dy / dist;
-              n1.x -= (nx * overlap) * 0.5; n1.y -= (ny * overlap) * 0.5;
-              n2.x += (nx * overlap) * 0.5; n2.y += (ny * overlap) * 0.5;
-              const kx = n1.vx - n2.vx; const ky = n1.vy - n2.vy;
-              const p = (nx * kx + ny * ky) * 0.8;
-              n1.vx -= p * nx; n1.vy -= p * ny;
-              n2.vx += p * nx; n2.vy += p * ny;
-            }
+          if (dist < collisionRadius && dist > 0) {
+            const overlap = collisionRadius - dist;
+            const nx = dx / dist; const ny = dy / dist;
+            n1.x -= (nx * overlap) * 0.5; n1.y -= (ny * overlap) * 0.5;
+            n2.x += (nx * overlap) * 0.5; n2.y += (ny * overlap) * 0.5;
+            const kx = n1.vx - n2.vx; const ky = n1.vy - n2.vy;
+            const p = (nx * kx + ny * ky) * 0.8;
+            n1.vx -= p * nx; n1.vy -= p * ny;
+            n2.vx += p * nx; n2.vy += p * ny;
           }
         }
-
-        nodes.forEach((node, i) => {
-          const el = nodesRef.current[i];
-          const ring = ringRefs.current[i];
-          if (!el || !ring) return;
-
-          node.vx *= friction; node.vy *= friction;
-          node.vx += (Math.random() - 0.5) * 0.2;
-          node.vy += (Math.random() - 0.5) * 0.2;
-          node.x += node.vx; node.y += node.vy;
-
-          if (node.x < boundaryPadding) { node.x = boundaryPadding; node.vx *= -1; }
-          if (node.x > width - boundaryPadding) { node.x = width - boundaryPadding; node.vx *= -1; }
-          if (node.y < boundaryPadding) { node.y = boundaryPadding; node.vy *= -1; }
-          if (node.y > height - boundaryPadding) { node.y = height - boundaryPadding; node.vy *= -1; }
-
-          node.rotSpeed = gsap.utils.interpolate(node.rotSpeed, 0.5, 0.02);
-          node.rotation += node.rotSpeed;
-
-          // will-change-transform už bys měl mít v CSS třídě u těch ringů, GSAP .set to přesune přes GPU
-          gsap.set(el, { x: node.x, y: node.y });
-          gsap.set(ring, { rotation: node.rotation });
-        });
       }
-      
-      // RequestAnimationFrame voláme pořád, ale "prázdně" - žere 0 % CPU
+
+      nodes.forEach((node, i) => {
+        const el = nodesRef.current[i];
+        const ring = ringRefs.current[i];
+        if (!el || !ring) return;
+
+        node.vx *= friction; node.vy *= friction;
+        node.vx += (Math.random() - 0.5) * 0.2;
+        node.vy += (Math.random() - 0.5) * 0.2;
+        node.x += node.vx; node.y += node.vy;
+
+        if (node.x < boundaryPadding) { node.x = boundaryPadding; node.vx *= -1; }
+        if (node.x > width - boundaryPadding) { node.x = width - boundaryPadding; node.vx *= -1; }
+        if (node.y < boundaryPadding) { node.y = boundaryPadding; node.vy *= -1; }
+        if (node.y > height - boundaryPadding) { node.y = height - boundaryPadding; node.vy *= -1; }
+
+        node.rotSpeed = gsap.utils.interpolate(node.rotSpeed, 0.5, 0.02);
+        node.rotation += node.rotSpeed;
+
+        gsap.set(el, { x: node.x, y: node.y });
+        gsap.set(ring, { rotation: node.rotation });
+      });
+
       animationFrameId = requestAnimationFrame(updatePhysics);
     };
     
+    // ZMĚNĚNO: Zapojíme smyčku přímo do ScrollTriggeru. Zapne se, jen když je sekce vidět.
+    ScrollTrigger.create({
+      trigger: sectionRef.current,
+      start: "top bottom", 
+      end: "bottom top", 
+      onToggle: (self) => { 
+        isVisible = self.isActive;
+        if (isVisible) {
+          updatePhysics(); // Nastartuje motor
+        } else {
+          cancelAnimationFrame(animationFrameId); // Zhasne motor
+        }
+      }
+    });
+    
     updatePhysics();
 
-    // Oprava varování v terminálu - animujeme přes bezpečný ref, ne přes className
     const titleEl = sectionRef.current?.querySelector('.cap-title');
     if (titleEl) {
       gsap.fromTo(titleEl, 
@@ -165,7 +162,6 @@ export const Capabilities = () => {
   const handleChargeStart = (index: number) => {
     isCharging.current[index] = true;
     
-    // [ ! ] ZAPNE MATRIX A POMALU HO UKÁŽE (Opacity 0.2 - decentní červená)
     isMatrixActive.current = true;
     if (canvasRef.current) {
       gsap.to(canvasRef.current, { opacity: 0.2, duration: 0.5, ease: "power2.out", filter: "brightness(1)" });
@@ -190,16 +186,15 @@ export const Capabilities = () => {
     gsap.to(inner, { scale: 1, duration: 0.6, ease: "elastic.out(1.2, 0.3)" });
     gsap.to(ring, { borderColor: "rgba(255, 255, 255, 0.1)", boxShadow: "none", duration: 0.8 });
 
-    // [ ! ] VÝBUCH MATRIXU A ÚPLNÉ VYPNUTÍ
     if (canvasRef.current) {
       gsap.fromTo(canvasRef.current,
-        { opacity: 0.5, filter: "brightness(2)" }, // Krátký záblesk
+        { opacity: 0.5, filter: "brightness(2)" },
         { 
-          opacity: 0, // Zmizí úplně
+          opacity: 0, 
           filter: "brightness(1)", 
           duration: 1.5, 
           ease: "power2.out",
-          onComplete: () => { isMatrixActive.current = false; } // Uspí procesor
+          onComplete: () => { isMatrixActive.current = false; } 
         }
       );
     }
@@ -228,8 +223,8 @@ export const Capabilities = () => {
   };
 
   return (
-    <section ref={sectionRef} id="capabilities" className="relative w-full h-[120vh] z-10 text-white flex flex-col items-center justify-center pt-24 pb-32">
-      <div className="cap-title flex flex-col items-center mb-8 md:mb-12 mix-blend-difference pointer-events-none px-4 text-center">
+    <section ref={sectionRef} id="capabilities" className="relative w-full h-[120vh] z-10 text-white flex flex-col items-center justify-center pt-24 pb-32 overflow-hidden">
+      <div className="cap-title flex flex-col items-center mb-8 md:mb-12 mix-blend-difference pointer-events-none px-4 text-center w-full max-w-[100vw]">
         <h2 className="font-syne font-bold text-4xl md:text-8xl uppercase tracking-tighter">Architecture</h2>
         <p className="font-mono text-[8px] md:text-xs tracking-[0.2em] md:tracking-[0.3em] uppercase text-white/50 mt-4 max-w-[80vw]">
           [ Containment Field ] — Hold node to charge. Release to fire.
@@ -237,10 +232,7 @@ export const Capabilities = () => {
       </div>
 
       <div ref={containerRef} className="relative w-[95vw] md:w-[90vw] max-w-6xl h-[70vh] bg-black/20 backdrop-blur-xl border border-white/10 rounded-[1rem] overflow-hidden shadow-[0_0_50px_rgba(255,255,255,0.01)]">
-
-        {/* OPRAVA: Počáteční opacita je 0, plátno je tmavé a čeká */}
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-0 pointer-events-none mix-blend-screen" />
-
         {skillsData.map((skill, i) => (
           <div
             key={i}
