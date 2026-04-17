@@ -6,6 +6,7 @@ import { Cursor } from "@/components/ui/cursor";
 import { LanguageProvider } from "@/components/navigation/language-toggle";
 import { Preloader } from "@/components/ui/preloader";
 import { DynamicFavicon } from "@/components/dynamic-favicon";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const syne = Syne({ subsets: ["latin"], weight: ["400", "700", "800"], variable: "--font-syne" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
