@@ -23,8 +23,8 @@ export const Hero = () => {
 
   useEffect(() => {
     const triggerAnim = () => setCanAnimate(true);
-    window.addEventListener("preloader-hide-start", triggerAnim);
-    return () => window.removeEventListener("preloader-hide-start", triggerAnim);
+    window.addEventListener("preloader-complete", triggerAnim);
+    return () => window.removeEventListener("preloader-complete", triggerAnim);
   },[]);
 
   useGSAP(() => {

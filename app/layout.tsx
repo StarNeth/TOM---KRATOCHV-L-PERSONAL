@@ -3,7 +3,6 @@ import { Syne, JetBrains_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { LenisProvider } from "@/components/providers/lenis-provider";
 import { Cursor } from "@/components/ui/cursor";
-import { Grain } from "@/components/ui/grain";
 import { LanguageProvider } from "@/components/navigation/language-toggle";
 import { Preloader } from "@/components/ui/preloader";
 import { DynamicFavicon } from "@/components/dynamic-favicon";
@@ -15,13 +14,16 @@ const instrumentSerif = Instrument_Serif({ subsets: ["latin"], weight: ["400"], 
 export const metadata: Metadata = {
   title: "Tomáš Kratochvíl — System Architect",
   description: "Creative developer crafting digital experiences with zero-error tolerance.",
+  verification: {
+    // TADY JE TVŮJ GOOGLE TAG
+    google: "1CP365_WIYoOWEKM24OqSPiXYtj-KMHNrMeU3Fz-aJ8"
+  }
 };
 
 export const viewport: Viewport = {
   themeColor: "#010101", 
   width: "device-width",
   initialScale: 1,
-  // Zabrání uživatelům na iPhonu nechtěně přibližovat web dvojitým poklepáním
   maximumScale: 1,
   userScalable: false,
 };
@@ -30,18 +32,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${syne.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} no-scrollbar overflow-x-hidden`}>
       <body suppressHydrationWarning className="bg-background text-foreground font-sans antialiased cursor-none overflow-x-hidden w-full relative">
-        
-        {/* [ ! ] PRELOADER ÚPLNĚ NAHOŘE */}
         <Preloader />
-
         <LanguageProvider>
           <LenisProvider>
             {children}
             <DynamicFavicon />
           </LenisProvider>
         </LanguageProvider>
-        <Cursor />
-        <Grain /> 
+        <Cursor /> 
       </body>
     </html>
   );

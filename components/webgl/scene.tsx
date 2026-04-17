@@ -92,7 +92,7 @@ const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
     #ifdef GL_ES
     precision ${isMobile ? 'mediump' : 'highp'} float;
     #endif
-    #define ITERATIONS ${isMobile ? '2' : '5'}
+    #define ITERATIONS ${isMobile ? '2' : '3'}
     
     uniform float uTime;
     uniform vec2 uResolution;
@@ -239,7 +239,7 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
         orthographic 
         camera={{ position:[0, 0, 1], left: -1, right: 1, top: 1, bottom: -1 }} 
         // Clamped DPR for extreme mobile performance
-        dpr={isMobile ? 0.75 : [1, 1.5]}
+        dpr={isMobile ? 0.75 : 1}
         gl={{ 
           powerPreference: "high-performance", 
           alpha: false, 
