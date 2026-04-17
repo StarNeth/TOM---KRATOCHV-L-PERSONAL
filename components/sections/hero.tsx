@@ -77,13 +77,12 @@ export const Hero = () => {
 
       <h1 
         ref={nameRef}
-        // Fixed clamp: 9vw ensures 10 characters fit perfectly within 90vw on mobile
         className="relative font-sans font-black tracking-tighter leading-[0.85] uppercase text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.15)] text-center will-change-transform w-full flex flex-col items-center opacity-0"
       >
-        <span className="block text-[clamp(2.5rem,9vw,6rem)] md:text-[clamp(5rem,8.5vw,10rem)] whitespace-nowrap">
+        <span className="block text-[clamp(2.2rem,11vw,6rem)] md:text-[clamp(5rem,8.5vw,10rem)] whitespace-nowrap">
           TOMÁŠ
         </span>
-        <span className="block text-[clamp(2.5rem,9vw,6rem)] md:text-[clamp(5rem,8.5vw,10rem)] text-white/90 whitespace-nowrap">
+        <span className="block text-[clamp(1.8rem,9vw,6rem)] md:text-[clamp(5rem,8.5vw,10rem)] text-white/90 whitespace-nowrap">
           KRATOCHVÍL
         </span>
       </h1>

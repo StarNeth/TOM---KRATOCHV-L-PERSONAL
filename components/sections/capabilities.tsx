@@ -212,9 +212,10 @@ export const Capabilities = () => {
 
   return (
     <section ref={sectionRef} id="capabilities" className="relative w-full h-[120vh] z-10 text-white flex flex-col items-center justify-center pt-24 pb-32 overflow-hidden">
-      <div className="cap-title flex flex-col items-center mb-8 md:mb-12 mix-blend-difference pointer-events-none px-4 text-center w-full max-w-[100vw]">
-        <h2 className="font-syne font-bold text-4xl md:text-8xl uppercase tracking-tighter">Architecture</h2>
-        <p className="font-mono text-[8px] md:text-xs tracking-[0.2em] md:tracking-[0.3em] uppercase text-white/50 mt-4 max-w-[80vw]">[ Containment Field ] — Hold node to charge. Release to fire.
+      <div className="cap-title flex flex-col items-center mb-8 md:mb-12 mix-blend-difference pointer-events-none px-4 text-center w-full max-w-[95vw]">
+        <h2 className="font-syne font-bold text-3xl md:text-8xl uppercase tracking-tighter">Architecture</h2>
+        <p className="font-mono text-[7px] md:text-xs tracking-[0.15em] md:tracking-[0.3em] uppercase text-white/50 mt-3 md:mt-4 max-w-[90vw] leading-relaxed">
+          [ Containment Field ] — Hold node to charge. Release to fire.
         </p>
       </div>
 

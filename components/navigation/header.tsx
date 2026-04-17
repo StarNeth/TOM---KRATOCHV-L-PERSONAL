@@ -6,7 +6,7 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger"; 
 import { useLenis } from "lenis/react";
-import { Globe, Activity, Circle } from "lucide-react";
+import { Globe, Activity, Circle, Menu, X } from "lucide-react";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(useGSAP, ScrollTrigger);
@@ -18,6 +18,7 @@ export const Header = () => {
   
   const [time, setTime] = useState<string>("00:00:00");
   const [scrollProg, setScrollProg] = useState<number>(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const updateTime = () => setTime(new Date().toLocaleTimeString('cs-CZ', { hour12: false }));
@@ -42,8 +43,9 @@ export const Header = () => {
     setScrollProg(Math.min(100, Math.max(0, Math.round(scroll.progress * 100))));
   });
 
-  const handleScrollTo = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+  const handleScrollTo = (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>, targetId: string) => {
     e.preventDefault();
+    setMobileMenuOpen(false);
     const target = document.querySelector<HTMLElement>(targetId);
     if (target) {
       if (lenis) {
@@ -53,6 +55,20 @@ export const Header = () => {
       }
     }
   };
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+      lenis?.stop();
+    } else {
+      document.body.style.overflow = '';
+      lenis?.start();
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen, lenis]);
 
   useGSAP(() => {
     gsap.fromTo(".sys-element", 
@@ -117,7 +133,16 @@ export const Header = () => {
           </div>
         </div>
 
-        {/* OPRAVA: hidden na mobilu, block na desktopu (md:block) */}
+        {/* Mobile menu button */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="sys-element md:hidden p-2 -mr-2 text-white"
+          aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+        >
+          {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+
+        {/* Desktop navigation */}
         <nav className="sys-element relative hidden md:block w-[400px] h-[130px] mt-6">
           {[
             { label: "About", id: "#about" }, 
@@ -142,6 +167,35 @@ export const Header = () => {
           ))}
         </nav>
       </div>
+
+      {/* Mobile fullscreen menu */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-[99] bg-black/95 backdrop-blur-xl md:hidden pointer-events-auto">
+          <nav className="flex flex-col items-center justify-center h-full gap-8">
+            {[
+              { label: "About", id: "#about" }, 
+              { label: "Work", id: "#work" }, 
+              { label: "Capabilities", id: "#capabilities" }, 
+              { label: "Contact", id: "#contact" }
+            ].map((item, i) => (
+              <button
+                key={item.label}
+                onClick={(e) => handleScrollTo(e, item.id)}
+                className="font-syne font-bold text-3xl uppercase tracking-tight text-white/80 hover:text-white transition-colors"
+                style={{ animationDelay: `${i * 100}ms` }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+          
+          {/* Mobile menu footer */}
+          <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-6 font-mono text-[10px] tracking-[0.2em] text-white/50 uppercase">
+            <span>{time}</span>
+            <span>{scrollProg.toString().padStart(2, '0')}%</span>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

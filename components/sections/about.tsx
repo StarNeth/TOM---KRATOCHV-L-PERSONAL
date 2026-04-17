@@ -105,7 +105,7 @@ export const About = () => {
         </div>
       </div>
 
-      <div className="relative z-10 max-w-[1400px] mx-auto px-6 md:px-12 lg:px-24">
+      <div className="relative z-10 max-w-[1400px] mx-auto px-4 md:px-12 lg:px-24">
         
         {/* EDITORIAL HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-32">
@@ -152,7 +152,7 @@ export const About = () => {
           <div className="lg:col-span-8 flex flex-col gap-24 md:gap-32 lg:pl-16">
             
             <div className="overflow-hidden mouse-parallax" ref={(el) => { textRefs.current[3] = el; }}>
-              <h3 className="font-syne font-bold text-3xl md:text-4xl lg:text-5xl leading-[1.2] tracking-tight uppercase">
+              <h3 className="font-syne font-bold text-2xl md:text-4xl lg:text-5xl leading-[1.2] tracking-tight uppercase">
                 My background does not lie in traditional design agencies. <span className="font-instrument font-light italic lowercase text-white/60 tracking-normal">It lies in the primary circuit of a nuclear reactor.</span>
               </h3>
             </div>

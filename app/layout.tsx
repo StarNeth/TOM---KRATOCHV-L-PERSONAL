@@ -27,8 +27,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${syne.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} no-scrollbar overflow-x-hidden`}>
-      <body suppressHydrationWarning className="bg-background text-foreground font-sans antialiased cursor-none overflow-x-hidden w-full relative">
+    <html lang="en" className={`${syne.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} no-scrollbar overflow-x-hidden bg-background`}>
+      <body suppressHydrationWarning className="bg-background text-foreground font-sans antialiased cursor-none overflow-x-hidden w-full max-w-[100vw] relative">
         
         {/* [ ! ] PRELOADER ÚPLNĚ NAHOŘE */}
         <Preloader />
