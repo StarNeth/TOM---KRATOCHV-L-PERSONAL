@@ -22,7 +22,7 @@ const getProjectData = (slug: string) => {
       approach: "Aplikovali jsme inženýrskou 'Zero-error' metodiku. Architektura je postavena na Next.js 16 s Turbopackem. Pro fyziku pohybu jsme propojili GSAP s Lenis smooth scrollem. Prostorová hloubka a částicové efekty jsou řízeny přes React Three Fiber (WebGL), zatímco UI komponenty využívají bezbariérové Radix primitiva.",
       techStack: ["Next.js", "React", "Three.js / WebGL", "GSAP", "Lenis", "Tailwind CSS"],
       image: "/shu-xien-glou.vercel.app_.png",
-      liveUrl: "https://shu-xien-glou.vercel.app" // Doplň reálný odkaz
+      liveUrl: "https://www.shuxianglou.cz/" // Doplň reálný odkaz
     };
   }
   
