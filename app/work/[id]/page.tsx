@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
-import { useLanguage } from "@/components/navigation/language-toggle";
 import { WebGLScene } from "@/components/webgl/scene"; 
 import { Grain } from "@/components/ui/grain";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
-// Lokální databáze obohacená o TECH STACK z tvého package.json
+// Lokální databáze obohacená o VŠECHNY tvé projekty
 const getProjectData = (slug: string) => {
   if (slug === "shu-xien-lou") {
     return {
@@ -21,20 +20,37 @@ const getProjectData = (slug: string) => {
       role: "System Architecture // WebGL UI",
       challenge: "Transformovat statickou prezentaci tradiční restaurace do hardwarově akcelerovaného digitálního zážitku. Cílem bylo absolutně plynulé rozhraní bez kompromisů v rychlosti načítání.",
       approach: "Aplikovali jsme inženýrskou 'Zero-error' metodiku. Architektura je postavena na Next.js 16 s Turbopackem. Pro fyziku pohybu jsme propojili GSAP s Lenis smooth scrollem. Prostorová hloubka a částicové efekty jsou řízeny přes React Three Fiber (WebGL), zatímco UI komponenty využívají bezbariérové Radix primitiva.",
-      techStack: ["Next.js 16", "React 19", "Three.js / WebGL", "GSAP 3", "Lenis", "Radix UI", "Tailwind 4"],
-      image: "/shu-xien-glou.vercel.app_.png" 
+      techStack: ["Next.js", "React", "Three.js / WebGL", "GSAP", "Lenis", "Tailwind CSS"],
+      image: "/shu-xien-glou.vercel.app_.png",
+      liveUrl: "https://shu-xien-glou.vercel.app" // Doplň reálný odkaz
     };
   }
-  // Default fallback
+  
+  if (slug === "kings-barber") {
+    return {
+      title: "KINGS BARBER",
+      brandColor: "transparent", 
+      textColor: "#FFFFFF",
+      role: "UI Engineering // Frontend",
+      challenge: "Vytvořit nekompromisní digitální prezentaci pro prémiový barbershop. Systém musel vyzařovat luxus, maskulinitu a fungovat bleskově na mobilních zařízeních.",
+      approach: "Postavili jsme temný, vysoce kontrastní design systém s plynulými mikrointerakcemi. Optimalizace LCP (Largest Contentful Paint) zajistila okamžité načítání velkých fotografií přes Next/Image, zatímco GSAP řídí hladký tok obsahu.",
+      techStack: ["Next.js", "React", "GSAP", "Tailwind CSS", "Framer Motion"],
+      image: "/kingsbarber-silk.vercel.app_.png", // Tvůj obrázek z public složky
+      liveUrl: "https://kingsbarber-silk.vercel.app" // Doplň reálný odkaz
+    };
+  }
+
+  // Default fallback (Aion)
   return {
     title: "PROJECT AION",
     brandColor: "transparent", 
     textColor: "#ffffff",
     role: "System Architect // R&D",
     challenge: "Od nuly postavit komplexní SaaS platformu, která integruje umělou inteligenci do procesu vývoje a testování.",
-    approach: "Místo manuálního psaní kódu jsme využili precizní prompt engineering k budování frontend architektury.",
+    approach: "Místo manuálního psaní kódu jsme využili precizní prompt engineering k budování frontend architektury a extrémně rychlému iterování.",
     techStack: ["React", "AI Prompting", "Node.js", "Security"],
-    image: "/shu-xien-glou.vercel.app_.png" 
+    image: "/aion.png", 
+    liveUrl: "#" 
   };
 };
 
@@ -44,8 +60,6 @@ export default function ProjectDetail() {
   const project = getProjectData(slug);
   
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const { language, setLanguage } = useLanguage();
 
   useEffect(() => {
     document.body.style.overflowX = "hidden";
@@ -93,35 +107,15 @@ export default function ProjectDetail() {
       {/* Fake Page Transition Overlay */}
       <div className="page-transition-overlay fixed inset-0 z-[200] bg-[#050505] pointer-events-none" />
 
-      {/* [SOTY] GRAIN KOMPONENTA */}
       <Grain />
-      
-      {/* [SOTY] WEBGL SCENE (Tvé Obsidian fluid pozadí) */}
       <WebGLScene />
 
-      {/* --- TOP NAVIGACE (Včetně Language Toggleru) --- */}
+      {/* --- TOP NAVIGACE (Už bez Language Toggleru) --- */}
       <nav className="fixed top-0 left-0 w-full p-6 md:p-12 z-[100] mix-blend-difference pointer-events-none flex justify-between items-center">
-        {/* Back Button */}
-        <Link href="/#work" className="font-syne font-bold text-xl pointer-events-auto hover:opacity-70 transition-opacity flex items-center gap-2 text-white">
-           ← <span className="uppercase text-sm tracking-widest mt-1 font-mono">Archive</span>
-        </Link>
-        
-        {/* Language Toggler (Minimalistický SOTY design) */}
-        <div className="pointer-events-auto flex items-center gap-4 font-mono text-[10px] tracking-[0.3em] uppercase">
-        <button 
-            onClick={() => setLanguage("cs")} 
-            className={`transition-all duration-300 ${language === "cs" ? "text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]" : "text-white/30 hover:text-white/70"}`}
-          >
-            CZ
-          </button>
-          <span className="text-white/20">//</span>
-          <button 
-            onClick={() => setLanguage("en")} 
-            className={`transition-all duration-300 ${language === "en" ? "text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]" : "text-white/30 hover:text-white/70"}`}
-          >
-            EN
-          </button>
-        </div>
+        {/* ZMĚNĚNO: Použit <a> tag pro vynucení hard-reloadu a reset GSAP stavů na hlavní stránce */}
+        <a href="/" className="font-syne font-bold text-xl pointer-events-auto hover:opacity-70 transition-opacity flex items-center gap-2 text-white">
+            ← <span className="uppercase text-sm tracking-widest mt-1 font-mono">Archive</span>
+        </a>
       </nav>
 
       {/* --- HERO SEKCE --- */}
@@ -133,14 +127,13 @@ export default function ProjectDetail() {
         </div>
       </section>
 
-      {/* --- OBSAHOVÁ ČÁST (SCROLL AREA) --- */}
-      {/* Zrušen marginTop, background transparent kvůli WebGL pozadí */}
+      {/* --- OBSAHOVÁ ČÁST --- */}
       <section className="relative z-10 w-full pb-48" style={{ color: project.textColor }}>
         <div className="h-12 md:h-24 w-full" />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 px-6 md:px-12 lg:px-24 max-w-[1800px] mx-auto relative">
           
-          {/* LEVÝ SLOUPEC: EDITORIAL INFO & TECH STACK (Sticky chování) */}
+          {/* LEVÝ SLOUPEC: EDITORIAL INFO & TECH STACK */}
           <div className="col-span-1 lg:col-span-4 flex flex-col gap-12 lg:pr-12 relative">
             <div className="flex flex-col gap-12 lg:sticky lg:top-32 bg-[#030303]/40 backdrop-blur-xl p-8 rounded-[2rem] border border-white/5 shadow-2xl">
               
@@ -163,7 +156,6 @@ export default function ProjectDetail() {
                 </p>
               </div>
 
-              {/* TECH STACK */}
               <div className="border-t border-white/20 pt-4 tech-container">
                 <span className="font-mono text-[10px] tracking-[0.25em] uppercase opacity-50 block mb-6">04 / Technologies</span>
                 <div className="flex flex-wrap gap-2">
@@ -175,27 +167,39 @@ export default function ProjectDetail() {
                 </div>
               </div>
 
+              {/* LIVE BUTTON */}
+              {project.liveUrl !== "#" && (
+                <div className="border-t border-white/20 pt-8 reveal-item">
+                  <a 
+                    href={project.liveUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="group relative w-full flex items-center justify-center gap-3 px-8 py-4 bg-white text-black rounded-full overflow-hidden"
+                  >
+                    <span className="relative z-10 font-syne font-bold uppercase tracking-widest text-xs">Launch Live Project</span>
+                    <span className="relative z-10 font-mono text-sm transform transition-transform group-hover:translate-x-1 group-hover:-translate-y-1">↗</span>
+                    <div className="absolute inset-0 bg-[#e0e0e0] transform scale-y-0 origin-bottom transition-transform duration-300 group-hover:scale-y-100" />
+                  </a>
+                </div>
+              )}
+
             </div>
           </div>
 
-          {/* PRAVÝ SLOUPEC: BROWSER MOCKUP (Full Scroll) */}
-          {/* Už žádný malý kontejner. Je vysoký přesně podle obrázku. Scroluješ jím přirozeně. */}
+          {/* PRAVÝ SLOUPEC: BROWSER MOCKUP */}
           <div className="col-span-1 lg:col-span-8 pt-12 lg:pt-0">
             <div className="w-full rounded-[1.5rem] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)] bg-[#050505] border border-white/10 flex flex-col">
               
-              {/* macOS Header - Obsahuje funkční CLOSE tlačítko */}
-              <div className="w-full h-12 border-b border-white/10 flex items-center px-6 gap-3 bg-[#111111]/90 backdrop-blur-md sticky top-0 z-20">
-                 {/* ČERVENÉ TLAČÍTKO (Pulzující zavírač) */}
-                 <Link href="/#work" className="group relative flex items-center justify-center">
+            <div className="w-full h-12 border-b border-white/10 flex items-center px-6 gap-3 bg-[#111111]/90 backdrop-blur-md sticky top-0 z-20">
+                 {/* ZMĚNĚNO: Použit <a> tag a href nastaven na "/" pro konzistentní hard-reload */}
+                 <a href="/" className="group relative flex items-center justify-center">
                     <div className="absolute inset-0 bg-[#ff2a00] rounded-full animate-ping opacity-60 group-hover:animate-none" />
                     <div className="w-3.5 h-3.5 rounded-full bg-[#ff2a00] shadow-[0_0_12px_rgba(255,42,0,0.8)] transition-transform duration-300 group-hover:scale-110" />
-                 </Link>
-                 {/* Žluté a zelené dekorativní tečky */}
+                 </a>
                  <div className="w-3.5 h-3.5 rounded-full bg-white/20" />
                  <div className="w-3.5 h-3.5 rounded-full bg-white/20" />
               </div>
               
-              {/* Samotná nekonečná fotka (Žádné overflow-y-auto, bere plnou výšku dokumentu) */}
               <div className="w-full relative">
                 <img 
                   src={project.image} 

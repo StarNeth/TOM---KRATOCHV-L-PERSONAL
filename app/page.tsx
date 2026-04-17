@@ -17,6 +17,12 @@ const WebGLScene = dynamic(
 export default function Home() {
   const [mountWebGL, setMountedWebGL] = useState(false);
 
+  // 1. Zcela samostatný useEffect pro scrollování nahoru při návratu na domovskou stránku
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+  
+  // 2. Druhý useEffect výhradně pro složitou logiku WebGL a preloaderu
   useEffect(() => {
     let isMounted = true;
     

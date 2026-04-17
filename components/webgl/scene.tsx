@@ -249,10 +249,13 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
           failIfMajorPerformanceCaveat: true, // Fail fast on weak GPUs
         }}
         onCreated={({ gl }) => {
-          // Monitor for WebGL errors
+          // 1. PŮVODNÍ: Hlídač chyb od v0
           gl.domElement.addEventListener("webglcontextlost", () => {
             setHasWebGLError(true);
           });
+          
+          // 2. NOVÉ: Výstřel eventu pro tvůj SOTY Preloader!
+          window.dispatchEvent(new CustomEvent("webgl-ready"));
         }}
       >
         <WebGLErrorHandler onError={() => setHasWebGLError(true)} />

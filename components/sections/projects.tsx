@@ -8,11 +8,10 @@ import Image from "next/image";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
-// Cleaned up image paths to standard web-safe names
 const projectsData = [
-  { id: "01", title: "Shu-Xien-Lou", role: "Frontend Architecture", image: "/shu-xien-glou.vercel.app_.png", brandColor: "#050505", slug: "shu-xien-lou" },
-  { id: "02", title: "Kings Barber", role: "UI Engineering", image: "/kings-barber.png", brandColor: "#0a0a0a", slug: "kings-barber" },
-  { id: "03", title: "Project Aion", role: "In Development", image: "/aion.png", brandColor: "#111111", slug: "aion" },
+  { id: "01", title: "Shu-Xien-Lou", role: "Interactive Web", image: "/shu-xien-glou.vercel.app_.png", brandColor: "#050505", slug: "shu-xien-lou", actionText: "Explore Project" },
+  { id: "02", title: "Kings Barber", role: "Digital Presentation", image: "/kings-barber.png", brandColor: "#0a0a0a", slug: "kings-barber", actionText: "Explore Project" },
+  { id: "03", title: "Project Aion", role: "SaaS R&D", image: "/aion.png", brandColor: "#111111", slug: "aion", actionText: "View Details" },
 ];
 
 export const Projects = () => {
@@ -79,10 +78,11 @@ export const Projects = () => {
               
               <div className="absolute inset-0 bg-black/60 group-hover:bg-black/10 transition-colors duration-700 z-10" />
               <div className="absolute bottom-6 md:bottom-8 left-6 md:left-8 right-6 md:right-8 z-20 flex justify-between items-end transform transition-transform duration-700 group-hover:translate-y-[-5px]">
-                <div className="flex flex-col">
+              <div className="flex flex-col">
                   <span className="font-mono text-[9px] md:text-[10px] tracking-widest uppercase text-white/60 mb-2">{p.id} // {p.role}</span>
+                  {/* ZMĚNĚNO: Nyní se dynamicky tahá actionText z databáze místo natvrdo napsaného "View Case Study" */}
                   <span className="font-instrument italic text-lg md:text-xl text-white opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">
-                    View Case Study
+                    {p.actionText}
                   </span>
                 </div>
               </div>

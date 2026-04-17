@@ -4,7 +4,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 
-// Character-by-character reveal component
+// Character-by-character reveal component (Nezměněno od v0)
 const TypedText = ({ 
   text, 
   delay = 0, 
@@ -64,6 +64,23 @@ export const Preloader = () => {
   const [counter, setCounter] = useState(0);
   const [phase, setPhase] = useState<"init" | "loading" | "reveal" | "done">("init");
   const [isFinished, setIsFinished] = useState(false);
+  
+  // NOVÉ: Stavy pro synchronizaci
+  const [isCounterDone, setIsCounterDone] = useState(false);
+  const [isWebglReady, setIsWebglReady] = useState(false);
+
+  // NOVÉ: Posloucháme, kdy WebGL řekne, že je hotovo
+  useEffect(() => {
+    const handleReady = () => setIsWebglReady(true);
+    window.addEventListener("webgl-ready", handleReady);
+    
+    // Fallback: kdyby WebGL zklamalo, po 5 sekundách to pustíme dál
+    const fallbackTimeout = setTimeout(handleReady, 5000);
+    return () => {
+      window.removeEventListener("webgl-ready", handleReady);
+      clearTimeout(fallbackTimeout);
+    };
+  }, []);
 
   // Counter animation
   const animateCounter = useCallback(() => {
@@ -77,27 +94,31 @@ export const Preloader = () => {
         setCounter(Math.floor(obj.value));
       },
       onComplete: () => {
-        setPhase("reveal");
+        // ZMĚNA: Nejdeme rovnou do reveal, ale jen zaznamenáme, že animace skončila
+        setIsCounterDone(true);
       }
     });
   }, []);
 
+  // NOVÉ: Jakmile skončí čítač A ZÁROVEŇ je WebGL načtené, přepneme fázi na "reveal"
+  useEffect(() => {
+    if (isCounterDone && isWebglReady && phase !== "reveal" && phase !== "done") {
+      setPhase("reveal");
+    }
+  }, [isCounterDone, isWebglReady, phase]);
+
   useGSAP(() => {
     if (!containerRef.current) return;
-    
-    // Lock scroll during preloader
     document.body.style.overflow = "hidden";
 
     const masterTimeline = gsap.timeline();
 
-    // Phase 1: Initial system boot text reveal
     masterTimeline
-      .to({}, { duration: 0.3 }) // Initial pause
+      .to({}, { duration: 0.3 }) 
       .call(() => setPhase("loading"))
       .to({}, { duration: 0.1 })
       .call(() => animateCounter());
 
-    // Progress bar animation (synced with counter)
     if (progressBarRef.current) {
       gsap.to(progressBarRef.current, {
         scaleX: 1,
@@ -106,10 +127,9 @@ export const Preloader = () => {
         delay: 0.4
       });
     }
-
   }, { scope: containerRef });
 
-  // Phase 2: Reveal animation (curtain transition)
+  // Phase 2: Reveal animation (Zůstává vizuál od v0)
   useEffect(() => {
     if (phase !== "reveal") return;
 
@@ -121,7 +141,6 @@ export const Preloader = () => {
       }
     });
 
-    // Flash effect
     revealTimeline
       .to(containerRef.current, {
         backgroundColor: "rgba(255, 255, 255, 0.03)",
@@ -133,11 +152,9 @@ export const Preloader = () => {
         duration: 0.2,
         ease: "power2.out"
       })
-      // Fire preloader-hide-start for Hero to begin animation
       .call(() => {
         window.dispatchEvent(new CustomEvent("preloader-hide-start"));
       })
-      // Curtain reveal
       .to(curtainTopRef.current, {
         yPercent: -100,
         duration: 0.8,
@@ -148,7 +165,6 @@ export const Preloader = () => {
         duration: 0.8,
         ease: "power4.inOut"
       }, "curtain")
-      // Fade out remaining elements
       .to(".preloader-content", {
         opacity: 0,
         duration: 0.3,
@@ -164,26 +180,12 @@ export const Preloader = () => {
   if (isFinished) return null;
 
   return (
-    <div 
-      ref={containerRef} 
-      className="fixed inset-0 z-[9999] bg-[#020202] flex flex-col items-center justify-center pointer-events-auto"
-    >
-      {/* Curtain Top */}
-      <div 
-        ref={curtainTopRef}
-        className="absolute top-0 left-0 right-0 h-1/2 bg-[#020202] z-50"
-      />
-      
-      {/* Curtain Bottom */}
-      <div 
-        ref={curtainBottomRef}
-        className="absolute bottom-0 left-0 right-0 h-1/2 bg-[#020202] z-50"
-      />
+    <div ref={containerRef} className="fixed inset-0 z-[9999] bg-[#020202] flex flex-col items-center justify-center pointer-events-auto">
+      {/* Vizuální kód zůstává beze změny od v0 */}
+      <div ref={curtainTopRef} className="absolute top-0 left-0 right-0 h-1/2 bg-[#020202] z-50" />
+      <div ref={curtainBottomRef} className="absolute bottom-0 left-0 right-0 h-1/2 bg-[#020202] z-50" />
 
-      {/* Preloader Content */}
       <div className="preloader-content relative z-40 flex flex-col items-center justify-center gap-8">
-        
-        {/* System Boot Text */}
         <div className="flex flex-col items-center gap-2">
           {phase === "init" && (
             <div className="font-mono text-[10px] tracking-[0.4em] text-white/30 uppercase">
@@ -196,7 +198,6 @@ export const Preloader = () => {
               <div className="font-syne font-black text-3xl md:text-5xl lg:text-6xl tracking-tighter text-white">
                 <TypedText text="TOMÁŠ KRATOCHVÍL" duration={0.8} delay={0.1} />
               </div>
-              
               <div className="font-mono text-[10px] tracking-[0.3em] text-white/40 uppercase">
                 <TypedText text="System Architect // Nuclear-Grade Code" duration={0.6} delay={0.3} />
               </div>
@@ -204,25 +205,14 @@ export const Preloader = () => {
           )}
         </div>
 
-        {/* Counter */}
         {(phase === "loading" || phase === "reveal") && (
           <div className="flex flex-col items-center gap-4 mt-8">
-            <span 
-              ref={counterRef}
-              className="font-mono text-6xl md:text-8xl font-bold tracking-tighter text-white tabular-nums"
-            >
+            <span ref={counterRef} className="font-mono text-6xl md:text-8xl font-bold tracking-tighter text-white tabular-nums">
               {counter.toString().padStart(3, "0")}
             </span>
-            
-            {/* Progress Bar */}
             <div className="relative w-48 md:w-64 h-[1px] bg-white/10 overflow-hidden">
-              <div 
-                ref={progressBarRef}
-                className="absolute inset-0 bg-white origin-left"
-                style={{ transform: "scaleX(0)" }}
-              />
+              <div ref={progressBarRef} className="absolute inset-0 bg-white origin-left" style={{ transform: "scaleX(0)" }} />
             </div>
-            
             <span className="font-mono text-[9px] tracking-[0.5em] text-white/20 uppercase mt-2">
               Loading Assets
             </span>
@@ -230,31 +220,16 @@ export const Preloader = () => {
         )}
       </div>
 
-      {/* Subtle corner markers */}
       <div className="preloader-content absolute top-8 left-8 flex items-center gap-2 opacity-30">
         <div className="w-3 h-[1px] bg-white" />
         <span className="font-mono text-[8px] tracking-[0.3em] text-white uppercase">SYS.01</span>
       </div>
-      
       <div className="preloader-content absolute bottom-8 right-8 flex items-center gap-2 opacity-30">
-        <span className="font-mono text-[8px] tracking-[0.3em] text-white uppercase">2024</span>
+        <span className="font-mono text-[8px] tracking-[0.3em] text-white uppercase">2026</span>
         <div className="w-3 h-[1px] bg-white" />
       </div>
-
-      {/* Ambient glow */}
-      <div 
-        className="preloader-content absolute w-[40vw] h-[40vw] max-w-[400px] max-h-[400px] rounded-full bg-white/5 blur-[100px] pointer-events-none"
-        style={{
-          animation: "pulse 4s ease-in-out infinite",
-        }}
-      />
-      
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 0.05; }
-          50% { transform: scale(1.2); opacity: 0.02; }
-        }
-      `}} />
+      <div className="preloader-content absolute w-[40vw] h-[40vw] max-w-[400px] max-h-[400px] rounded-full bg-white/5 blur-[100px] pointer-events-none" style={{ animation: "pulse 4s ease-in-out infinite" }} />
+      <style dangerouslySetInnerHTML={{__html: `@keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.05; } 50% { transform: scale(1.2); opacity: 0.02; } }`}} />
     </div>
   );
 };
