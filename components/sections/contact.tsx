@@ -81,20 +81,21 @@ export const Contact = () => {
             </div>
           </div>
 
-          <h2 className="font-syne font-black text-[clamp(1.5rem,4vw,7rem)] leading-[1] tracking-tight text-white transition-all duration-200 group-hover:text-transparent group-hover:[-webkit-text-stroke:2px_white] break-all md:break-normal px-4">
-            starnethmain@seznam.cz
+          <h2 className="font-syne font-black text-[clamp(1.1rem,5vw,7rem)] md:text-[clamp(2rem,5vw,7rem)] leading-[1.1] tracking-tight text-white transition-all duration-200 group-hover:text-transparent group-hover:[-webkit-text-stroke:2px_white] break-words hyphens-auto px-2 md:px-4 max-w-full">
+            <span className="hidden md:inline">starnethmain@seznam.cz</span>
+            <span className="md:hidden">starnethmain<wbr />@seznam.cz</span>
           </h2>
         </div>
 
         {/* CENTROVANÉ SOCIAL ODKAZY (Zcela nový SOTY element) */}
-        <div className="contact-reveal mt-16 md:mt-24 flex flex-col md:flex-row items-center justify-center gap-10 md:gap-20">
+        <div className="contact-reveal mt-12 md:mt-24 flex flex-wrap items-center justify-center gap-6 md:gap-20 px-4">
           {socials.map((social) => (
             <Link
               key={social.label} 
               href={social.href} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="group relative overflow-hidden font-syne font-bold text-2xl md:text-3xl lg:text-4xl uppercase tracking-tighter text-white/50 hover:text-white transition-colors"
+              className="group relative overflow-hidden font-syne font-bold text-xl md:text-3xl lg:text-4xl uppercase tracking-tighter text-white/50 hover:text-white transition-colors"
             >
               {/* Luxusní Text Roll Effect */}
               <span className="inline-block transition-transform duration-[0.6s] ease-[cubic-bezier(0.19,1,0.22,1)] group-hover:-translate-y-[120%]">

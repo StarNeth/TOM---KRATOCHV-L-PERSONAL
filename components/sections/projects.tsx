@@ -47,9 +47,9 @@ export const Projects = () => {
     <section ref={sectionRef} id="work" className="relative w-full h-[100svh] bg-transparent overflow-hidden">
       <div ref={trackRef} className="flex h-full items-center px-[5vw] md:px-[10vw] gap-[8vw] md:gap-[15vw] will-change-transform py-20">
         
-        <div className="flex-shrink-0 w-[90vw] md:w-[40vw] pl-4 md:pl-0 max-w-[100vw]">
-          <span className="font-mono text-[10px] tracking-[0.5em] text-white/40 uppercase block mb-6">02 // Selected Work</span>
-          <h2 className="font-syne font-black text-5xl sm:text-6xl md:text-9xl uppercase tracking-tighter leading-[0.8] text-white break-words">
+        <div className="flex-shrink-0 w-[85vw] md:w-[40vw] pl-4 md:pl-0 max-w-[90vw]">
+          <span className="font-mono text-[9px] md:text-[10px] tracking-[0.4em] md:tracking-[0.5em] text-white/40 uppercase block mb-4 md:mb-6">02 // Selected Work</span>
+          <h2 className="font-syne font-black text-4xl sm:text-6xl md:text-9xl uppercase tracking-tighter leading-[0.85] text-white">
             Proven <br /> <span className="font-instrument italic font-light lowercase">Systems.</span>
           </h2>
         </div>
@@ -61,8 +61,8 @@ export const Projects = () => {
             aria-label={`View case study for ${p.title}`}
             className="group relative w-[85vw] md:w-[50vw] h-[60svh] md:h-[65vh] flex-shrink-0 cursor-pointer block"
           >
-            <div className="absolute -top-8 md:-top-12 left-0 z-20 mix-blend-difference pointer-events-none transition-transform duration-700 group-hover:-translate-y-4">
-              <h3 className="font-syne font-black text-3xl sm:text-5xl md:text-8xl lg:text-9xl uppercase tracking-tighter text-white opacity-80 group-hover:opacity-100 transition-opacity break-words max-w-[85vw]">
+            <div className="absolute -top-6 md:-top-12 left-0 z-20 mix-blend-difference pointer-events-none transition-transform duration-700 group-hover:-translate-y-4 max-w-full overflow-hidden">
+              <h3 className="font-syne font-black text-2xl sm:text-4xl md:text-7xl lg:text-8xl uppercase tracking-tighter text-white opacity-80 group-hover:opacity-100 transition-opacity truncate">
                 {p.title}
               </h3>
             </div>

@@ -1,9 +1,19 @@
 @import "tailwindcss";
 
 html, body {
-  overflow-x: hidden; /* Zakáže posouvání do stran (horizontal scroll) */
+  overflow-x: hidden !important;
   width: 100%;
+  max-width: 100vw;
   position: relative;
+}
+
+/* Prevent text overflow on mobile */
+@media (max-width: 768px) {
+  h1, h2, h3, h4, h5, h6 {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
 }
 
 @layer base {
@@ -27,8 +37,9 @@ html, body {
 }
 
 @theme inline {
-  --font-sans: "Syne", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: var(--font-syne), "Syne", system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), "JetBrains Mono", monospace;
+  --font-serif: var(--font-instrument), "Instrument Serif", Georgia, serif;
 
   --color-background: oklch(0.035 0 0);
   --color-foreground: oklch(0.92 0 0);
@@ -174,6 +185,15 @@ html.lenis body {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* Font utilities */
+.font-syne {
+  font-family: var(--font-syne), "Syne", system-ui, sans-serif;
+}
+
+.font-instrument {
+  font-family: var(--font-instrument), "Instrument Serif", Georgia, serif;
 }
 
 /* Project card */
