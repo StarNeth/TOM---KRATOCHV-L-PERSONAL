@@ -18,24 +18,42 @@ export default function Home() {
   const [mountWebGL, setMountedWebGL] = useState(false);
 
   useEffect(() => {
-    // ZMĚNĚNO: Sekvenční zapalování (Sequential Ignition).
-    // Necháme grafickou kartu odpočinout během Preloaderu. 
-    // WebGL se začne kompilovat až ve chvíli, kdy Preloader skončí.
+    let isMounted = true;
+    
+    // Sequential ignition: Wait for preloader to complete before mounting WebGL
+    // This prevents GPU contention during the loading phase
     const handlePreloaderDone = () => {
-      // Dáme prohlížeči ještě 100ms volno na překreslení DOMu, pak nahodíme 3D
-      setTimeout(() => setMountedWebGL(true), 100);
+      // Use requestIdleCallback for non-blocking WebGL initialization
+      // This reduces TBT by deferring heavy GPU work to idle periods
+      const mountCanvas = () => {
+        if (!isMounted) return;
+        // Small delay for DOM repaint before starting WebGL
+        requestAnimationFrame(() => {
+          if (isMounted) setMountedWebGL(true);
+        });
+      };
+
+      if ("requestIdleCallback" in window) {
+        requestIdleCallback(mountCanvas, { timeout: 2000 });
+      } else {
+        // Fallback for Safari and older browsers
+        setTimeout(mountCanvas, 150);
+      }
     };
 
     window.addEventListener("preloader-complete", handlePreloaderDone);
 
-    // Záchrana pro jistotu (kdyby event selhal)
-    const safetyTimer = setTimeout(() => setMountedWebGL(true), 4000);
+    // Safety fallback if preloader event doesn't fire
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) setMountedWebGL(true);
+    }, 5000);
 
     return () => {
+      isMounted = false;
       window.removeEventListener("preloader-complete", handlePreloaderDone);
       clearTimeout(safetyTimer);
     };
-  }, []);
+  }, []); // Empty dependency array - run once on mount
 
   return (
     <>

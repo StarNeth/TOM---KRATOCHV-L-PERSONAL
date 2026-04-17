@@ -73,17 +73,17 @@ export const Hero = () => {
 
   return (
     <section ref={containerRef} className="relative h-[100svh] w-full flex flex-col justify-center items-center z-10 overflow-hidden perspective-[1000px]">
-      <div className="relative z-10 flex flex-col items-center w-full max-w-[100vw] px-4 mix-blend-difference overflow-hidden">
+      <div className="relative z-10 flex flex-col items-center w-full max-w-[100vw] px-4 sm:px-6 mix-blend-difference overflow-hidden">
 
       <h1 
         ref={nameRef}
-        // Fixed clamp: 9vw ensures 10 characters fit perfectly within 90vw on mobile
         className="relative font-sans font-black tracking-tighter leading-[0.85] uppercase text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.15)] text-center will-change-transform w-full flex flex-col items-center opacity-0"
       >
-        <span className="block text-[clamp(2.5rem,9vw,6rem)] md:text-[clamp(5rem,8.5vw,10rem)] whitespace-nowrap">
+        {/* Responsive typography: scales smoothly across all breakpoints */}
+        <span className="block text-[clamp(2rem,8vw,6rem)] sm:text-[clamp(3rem,9vw,7rem)] md:text-[clamp(5rem,8.5vw,10rem)] whitespace-nowrap">
           TOMÁŠ
         </span>
-        <span className="block text-[clamp(2.5rem,9vw,6rem)] md:text-[clamp(5rem,8.5vw,10rem)] text-white/90 whitespace-nowrap">
+        <span className="block text-[clamp(2rem,8vw,6rem)] sm:text-[clamp(3rem,9vw,7rem)] md:text-[clamp(5rem,8.5vw,10rem)] text-white/90 whitespace-nowrap">
           KRATOCHVÍL
         </span>
       </h1>
