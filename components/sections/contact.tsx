@@ -48,7 +48,7 @@ export const Contact = () => {
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText("starnethmain@seznam.cz");
+    navigator.clipboard.writeText("root@tomaskratochvil.com");
     setCopied(true);
     gsap.fromTo(".copy-feedback", 
       { opacity: 0, scale: 0.8, y: 10 }, 
