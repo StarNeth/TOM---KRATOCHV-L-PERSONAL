@@ -5,8 +5,7 @@ import { useParams } from "next/navigation";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
-import { WebGLScene } from "@/components/webgl/scene"; 
-import { Grain } from "@/components/ui/grain";
+import { WebGLScene } from "@/components/webgl/scene";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
@@ -106,8 +105,6 @@ export default function ProjectDetail() {
       
       {/* Fake Page Transition Overlay */}
       <div className="page-transition-overlay fixed inset-0 z-[200] bg-[#050505] pointer-events-none" />
-
-      <Grain />
       <WebGLScene />
 
       {/* --- TOP NAVIGACE (Už bez Language Toggleru) --- */}
