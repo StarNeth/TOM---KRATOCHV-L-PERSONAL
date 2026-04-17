@@ -54,7 +54,7 @@ export const Projects = () => {
           </h2>
         </div>
 
-        {projectsData.map((p) => (
+        {projectsData.map((p, index) => (
           <Link 
             key={p.id} 
             href={`/work/${p.slug}`} 
@@ -74,8 +74,7 @@ export const Projects = () => {
                 fill
                 sizes="(max-width: 768px) 85vw, 50vw"
                 className="object-cover object-top transition-all duration-[10s] ease-linear group-hover:object-bottom"
-                loading="lazy"
-                quality={80}
+                priority={index === 0} // ZÁSADNÍ OPRAVA: První obrázek se načte okamžitě, ostatní ne
               />
               
               <div className="absolute inset-0 bg-black/60 group-hover:bg-black/10 transition-colors duration-700 z-10" />

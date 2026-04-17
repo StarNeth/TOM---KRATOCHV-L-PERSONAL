@@ -6,6 +6,7 @@ import { Cursor } from "@/components/ui/cursor";
 import { Grain } from "@/components/ui/grain";
 import { LanguageProvider } from "@/components/navigation/language-toggle";
 import { Preloader } from "@/components/ui/preloader";
+import { DynamicFavicon } from "@/components/dynamic-favicon";
 
 const syne = Syne({ subsets: ["latin"], weight: ["400", "700", "800"], variable: "--font-syne" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
@@ -36,9 +37,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <LanguageProvider>
           <LenisProvider>
             {children}
+            <DynamicFavicon />
           </LenisProvider>
         </LanguageProvider>
-        
         <Cursor />
         <Grain /> 
       </body>

@@ -82,7 +82,7 @@ export const Contact = () => {
           </div>
 
           <h2 className="font-syne font-black text-[clamp(1.5rem,4vw,7rem)] leading-[1] tracking-tight text-white transition-all duration-200 group-hover:text-transparent group-hover:[-webkit-text-stroke:2px_white] break-all md:break-normal px-4">
-            starnethmain@seznam.cz
+          root@tomaskratochvil.com
           </h2>
         </div>
 
