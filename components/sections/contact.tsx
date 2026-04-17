@@ -32,13 +32,13 @@ export const Contact = () => {
   }, { scope: sectionRef });
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!emailRef.current) return;
+    if (!emailRef.current || window.innerWidth < 768) return; // Disable on mobile
     const rect = emailRef.current.getBoundingClientRect();
     const x = e.clientX - (rect.left + rect.width / 2);
     const y = e.clientY - (rect.top + rect.height / 2);
 
     gsap.to(emailRef.current, {
-      x: x * 0.15, y: y * 0.15, duration: 0.2, ease: "power2.out"
+      x: x * 0.1, y: y * 0.1, duration: 0.2, ease: "power2.out"
     });
   };
 
@@ -59,44 +59,64 @@ export const Contact = () => {
   };
 
   return (
-    <section ref={sectionRef} id="contact" className="relative min-h-screen flex flex-col items-center justify-center px-4 md:px-12 z-10 bg-transparent text-white overflow-hidden perspective-[1000px]">
+    <section 
+      ref={sectionRef} 
+      id="contact" 
+      className="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 md:px-12 z-10 bg-transparent text-white overflow-hidden perspective-[1000px]"
+    >
       
-      <div className="flex-1 flex flex-col items-center justify-center w-full relative z-10 parallax-content mt-10">
+      <div className="flex-1 flex flex-col items-center justify-center w-full max-w-full relative z-10 parallax-content mt-10">
         
-        {/* ZÁHLAVÍ */}
-        <div className="contact-reveal flex items-center justify-center gap-6 mb-12 opacity-50">
+        {/* Header */}
+        <div className="contact-reveal flex items-center justify-center gap-4 sm:gap-6 mb-8 sm:mb-12 opacity-50">
           <span className="text-[10px] font-mono tracking-[0.3em] uppercase">04</span>
-          <div className="w-12 md:w-24 h-[1px] bg-white/30" />
+          <div className="w-8 sm:w-12 md:w-24 h-[1px] bg-white/30" />
           <span className="text-[10px] font-mono tracking-[0.3em] uppercase">Initiate Sequence</span>
         </div>
 
-        {/* E-MAIL (HLAVNÍ BOD) */}
+        {/* Email (Main CTA) - Responsive Typography */}
         <div 
-          className="contact-reveal relative cursor-pointer w-full text-center group z-20"
-          onClick={handleCopy} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} ref={emailRef}
+          className="contact-reveal relative cursor-pointer w-full max-w-full text-center group z-20 px-2"
+          onClick={handleCopy} 
+          onMouseMove={handleMouseMove} 
+          onMouseLeave={handleMouseLeave} 
+          ref={emailRef}
         >
-          <div className="copy-feedback absolute left-1/2 -translate-x-1/2 -top-16 opacity-0 pointer-events-none z-30">
-            <div className="px-5 py-2 bg-white text-black font-mono text-xs tracking-[0.2em] uppercase rounded-none drop-shadow-2xl">
+          <div className="copy-feedback absolute left-1/2 -translate-x-1/2 -top-12 sm:-top-16 opacity-0 pointer-events-none z-30">
+            <div className="px-4 sm:px-5 py-2 bg-white text-black font-mono text-[10px] sm:text-xs tracking-[0.2em] uppercase rounded-none drop-shadow-2xl whitespace-nowrap">
               [ Copied to clipboard ]
             </div>
           </div>
 
-          <h2 className="font-syne font-black text-[clamp(1.5rem,4vw,7rem)] leading-[1] tracking-tight text-white transition-all duration-200 group-hover:text-transparent group-hover:[-webkit-text-stroke:2px_white] break-all md:break-normal px-4">
-          root@tomaskratochvil.com
+          {/* 
+            Responsive Email Typography:
+            - Mobile: clamp(1.2rem, 6vw, 2rem) with break-all for word-break
+            - Desktop: clamp(2rem, 5vw, 7rem) with normal break
+          */}
+          <h2 
+            className="font-syne font-black leading-[1.1] tracking-tight text-white transition-all duration-200 group-hover:text-transparent group-hover:[-webkit-text-stroke:2px_white] text-[clamp(1.25rem,6vw,2.5rem)] sm:text-[clamp(2rem,5vw,4rem)] md:text-[clamp(2.5rem,4.5vw,7rem)] break-all sm:break-normal hyphens-auto sm:hyphens-none"
+            lang="en"
+          >
+            root@tomaskratochvil.com
           </h2>
+          
+          {/* Click hint */}
+          <span className="block mt-4 font-mono text-[9px] sm:text-[10px] tracking-[0.3em] text-white/30 uppercase opacity-0 group-hover:opacity-100 transition-opacity">
+            Click to copy
+          </span>
         </div>
 
-        {/* CENTROVANÉ SOCIAL ODKAZY (Zcela nový SOTY element) */}
-        <div className="contact-reveal mt-16 md:mt-24 flex flex-col md:flex-row items-center justify-center gap-10 md:gap-20">
+        {/* Social Links - Responsive */}
+        <div className="contact-reveal mt-12 sm:mt-16 md:mt-24 flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-10 md:gap-20">
           {socials.map((social) => (
             <Link
               key={social.label} 
               href={social.href} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="group relative overflow-hidden font-syne font-bold text-2xl md:text-3xl lg:text-4xl uppercase tracking-tighter text-white/50 hover:text-white transition-colors"
+              className="group relative overflow-hidden font-syne font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl uppercase tracking-tighter text-white/50 hover:text-white transition-colors"
             >
-              {/* Luxusní Text Roll Effect */}
+              {/* Text Roll Effect */}
               <span className="inline-block transition-transform duration-[0.6s] ease-[cubic-bezier(0.19,1,0.22,1)] group-hover:-translate-y-[120%]">
                 {social.label}
               </span>
@@ -109,9 +129,9 @@ export const Contact = () => {
 
       </div>
 
-      {/* MINIMALISTICKÝ COPYRIGHT DOLE */}
-      <footer className="absolute bottom-6 w-full text-center pointer-events-none opacity-30">
-         <span className="font-mono text-[10px] tracking-[0.3em] uppercase">
+      {/* Minimal Footer */}
+      <footer className="absolute bottom-4 sm:bottom-6 w-full text-center pointer-events-none opacity-30 px-4">
+         <span className="font-mono text-[9px] sm:text-[10px] tracking-[0.3em] uppercase">
             © {new Date().getFullYear()} Tomáš Kratochvíl
          </span>
       </footer>

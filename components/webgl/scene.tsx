@@ -1,11 +1,13 @@
 "use client";
 
-import { useRef, useMemo, useEffect } from "react";
+import { useRef, useMemo, useEffect, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useLenis } from "lenis/react";
 import gsap from "gsap";
 import { useMobile } from "@/hooks/use-mobile";
+import { useWebGLSupport } from "@/hooks/use-webgl-support";
+import { CSSFallbackGradient } from "./css-fallback-gradient";
 
 const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
@@ -85,9 +87,12 @@ const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
 
   const vertexShader = `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position, 1.0); }`;
 
-  // Adaptive Shader: Mobile uses 3 iterations, Desktop uses 5. Massive FPS gain.
+  // Adaptive Shader: Mobile uses mediump + 2 iterations, Desktop uses highp + 5.
   const fragmentShader = useMemo(() => `
-    #define ITERATIONS ${isMobile ? '3' : '5'}
+    #ifdef GL_ES
+    precision ${isMobile ? 'mediump' : 'highp'} float;
+    #endif
+    #define ITERATIONS ${isMobile ? '2' : '5'}
     
     uniform float uTime;
     uniform vec2 uResolution;
@@ -188,8 +193,45 @@ const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
   return <shaderMaterial ref={materialRef} vertexShader={vertexShader} fragmentShader={fragmentShader} uniforms={uniforms} depthWrite={false} depthTest={false} />;
 };
 
-export const WebGLScene = () => {
+// Error boundary component for WebGL context loss
+const WebGLErrorHandler = ({ onError }: { onError: () => void }) => {
+  useEffect(() => {
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      console.warn("[v0] WebGL context lost - switching to fallback");
+      onError();
+    };
+
+    const canvas = document.querySelector("canvas");
+    if (canvas) {
+      canvas.addEventListener("webglcontextlost", handleContextLost);
+      return () => canvas.removeEventListener("webglcontextlost", handleContextLost);
+    }
+  }, [onError]);
+
+  return null;
+};
+
+interface WebGLSceneProps {
+  forceRender?: boolean;
+}
+
+export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
   const isMobile = useMobile();
+  const { canUseWebGL, isReady, triggerFallback } = useWebGLSupport();
+  const [hasWebGLError, setHasWebGLError] = useState(false);
+
+  // If WebGL check failed or error occurred, show CSS fallback
+  const shouldUseFallback = !forceRender && (hasWebGLError || (isReady && !canUseWebGL));
+
+  if (shouldUseFallback) {
+    return <CSSFallbackGradient />;
+  }
+
+  // Still checking WebGL support - render nothing to avoid flash
+  if (!isReady && !forceRender) {
+    return <div className="fixed inset-0 w-full h-full z-0 bg-[#020203]" />;
+  }
 
   return (
     <div className="fixed inset-0 w-full h-full z-0 pointer-events-none">
@@ -197,9 +239,23 @@ export const WebGLScene = () => {
         orthographic 
         camera={{ position:[0, 0, 1], left: -1, right: 1, top: 1, bottom: -1 }} 
         // Clamped DPR for extreme mobile performance
-        dpr={isMobile ? 0.75 :[1, 1.5]}
-        gl={{ powerPreference: "high-performance", alpha: false, antialias: false, stencil: false, depth: false }}
+        dpr={isMobile ? 0.75 : [1, 1.5]}
+        gl={{ 
+          powerPreference: "high-performance", 
+          alpha: false, 
+          antialias: false, 
+          stencil: false, 
+          depth: false,
+          failIfMajorPerformanceCaveat: true, // Fail fast on weak GPUs
+        }}
+        onCreated={({ gl }) => {
+          // Monitor for WebGL errors
+          gl.domElement.addEventListener("webglcontextlost", () => {
+            setHasWebGLError(true);
+          });
+        }}
       >
+        <WebGLErrorHandler onError={() => setHasWebGLError(true)} />
         <mesh>
           <planeGeometry args={[2, 2]} />
           <LiquidObsidianMaterial isMobile={isMobile} />

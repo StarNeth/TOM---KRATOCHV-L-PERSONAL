@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { MeshDistortMaterial, Float } from "@react-three/drei";
 import * as THREE from "three";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useMobile } from "@/hooks/use-mobile";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger, useGSAP);
 
-// --- LUXUSNÍ TEMNÝ SKLENĚNÝ OBJEKT (Organická abstrakce) ---
+// Luxurious Dark Glass Object
 const DarkGlassShape = () => {
   const meshRef = useRef<THREE.Mesh>(null);
 
@@ -39,12 +40,67 @@ const DarkGlassShape = () => {
   );
 };
 
+// Lazy-loaded 3D Background with IntersectionObserver
+const Lazy3DBackground = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
+  const isMobile = useMobile();
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          // Delay Canvas mount to prevent TBT spike
+          if ("requestIdleCallback" in window) {
+            requestIdleCallback(() => setShouldRender(true), { timeout: 1000 });
+          } else {
+            setTimeout(() => setShouldRender(true), 200);
+          }
+        }
+      },
+      { 
+        rootMargin: "100px 0px", // Start loading slightly before in view
+        threshold: 0.1 
+      }
+    );
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} className="absolute inset-0 z-0 pointer-events-none opacity-40">
+      <div className="sticky top-0 h-screen w-full flex items-center justify-center">
+        {shouldRender && (
+          <Canvas 
+            camera={{ position: [0, 0, 6] }}
+            dpr={isMobile ? [0.5, 0.75] : [1, 1.5]} // Lower DPR on mobile
+            gl={{ 
+              powerPreference: isMobile ? "low-power" : "high-performance",
+              antialias: !isMobile,
+            }}
+          >
+            <ambientLight intensity={1} />
+            <directionalLight position={[10, 10, 5]} intensity={2} />
+            <DarkGlassShape />
+          </Canvas>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const About = () => {
   const containerRef = useRef<HTMLElement>(null);
   const textRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const isMobile = useMobile();
 
   useGSAP(() => {
-    // Kinetický maskovaný reveal textů při scrollu
+    // Kinetic masked reveal of text on scroll
     textRefs.current.forEach((el) => {
       if (!el) return;
       gsap.fromTo(el,
@@ -63,7 +119,7 @@ export const About = () => {
       );
     });
 
-    // Parallax jemných linek
+    // Parallax editorial lines
     gsap.utils.toArray(".editorial-line").forEach((line: any) => {
       gsap.fromTo(line, 
         { scaleX: 0 }, 
@@ -73,9 +129,9 @@ export const About = () => {
 
   }, { scope: containerRef });
 
-  // Jemný mouse-move parallax pro textové bloky
+  // Subtle mouse-move parallax for text blocks (desktop only)
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || isMobile) return;
     const x = (e.clientX / window.innerWidth - 0.5) * 20;
     const y = (e.clientY / window.innerHeight - 0.5) * 20;
     
@@ -94,40 +150,32 @@ export const About = () => {
       onMouseMove={handleMouseMove}
       className="relative w-full min-h-[150vh] bg-transparent text-white pt-32 pb-48 z-10"
     >
-      {/* 3D POZADÍ - Fixované v rámci sekce */}
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
-        <div className="sticky top-0 h-screen w-full flex items-center justify-center">
-          <Canvas camera={{ position: [0, 0, 6] }}>
-            <ambientLight intensity={1} />
-            <directionalLight position={[10, 10, 5]} intensity={2} />
-            <DarkGlassShape />
-          </Canvas>
-        </div>
-      </div>
+      {/* 3D Background - Lazy loaded with IntersectionObserver */}
+      <Lazy3DBackground />
 
-      <div className="relative z-10 max-w-[1400px] mx-auto px-6 md:px-12 lg:px-24">
+      <div className="relative z-10 max-w-[1400px] mx-auto px-4 sm:px-6 md:px-12 lg:px-24">
         
-        {/* EDITORIAL HEADER */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-32">
+        {/* Editorial Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 sm:mb-24 md:mb-32">
           <div className="overflow-hidden" ref={(el) => { textRefs.current[0] = el; }}>
             <span className="font-mono text-xs tracking-[0.2em] text-white/40 uppercase block mb-4">
               01 / Architecture
             </span>
-            <h2 className="font-syne font-black text-5xl md:text-7xl lg:text-8xl tracking-tighter uppercase leading-[0.9]">
+            <h2 className="font-syne font-black text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tighter uppercase leading-[0.9]">
               Engineering <br />
               <span className="font-instrument font-light italic lowercase text-white/80 tracking-normal">precision.</span>
             </h2>
           </div>
         </div>
 
-        <div className="editorial-line w-full h-[1px] bg-white/20 origin-left mb-32" />
+        <div className="editorial-line w-full h-[1px] bg-white/20 origin-left mb-16 sm:mb-24 md:mb-32" />
 
-        {/* OBSAHOVÝ GRID (Zlatý řez layout) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-8">
+        {/* Content Grid (Golden Ratio layout) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8">
           
-          {/* Sticky Sidebar s detaily */}
-          <div className="lg:col-span-4 flex flex-col gap-12">
-            <div className="sticky top-40 flex flex-col gap-12 mouse-parallax">
+          {/* Sticky Sidebar with details */}
+          <div className="lg:col-span-4 flex flex-col gap-8 sm:gap-12">
+            <div className="lg:sticky lg:top-40 flex flex-col gap-8 sm:gap-12 mouse-parallax">
               <div className="overflow-hidden" ref={(el) => { textRefs.current[1] = el; }}>
                 <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 uppercase block mb-4">Methodology</span>
                 <p className="font-sans text-sm md:text-base leading-relaxed text-white/70">
@@ -148,11 +196,11 @@ export const About = () => {
             </div>
           </div>
 
-          {/* Hlavní vyprávění */}
-          <div className="lg:col-span-8 flex flex-col gap-24 md:gap-32 lg:pl-16">
+          {/* Main narrative */}
+          <div className="lg:col-span-8 flex flex-col gap-16 sm:gap-24 md:gap-32 lg:pl-16">
             
             <div className="overflow-hidden mouse-parallax" ref={(el) => { textRefs.current[3] = el; }}>
-              <h3 className="font-syne font-bold text-3xl md:text-4xl lg:text-5xl leading-[1.2] tracking-tight uppercase">
+              <h3 className="font-syne font-bold text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-[1.2] tracking-tight uppercase">
                 My background does not lie in traditional design agencies. <span className="font-instrument font-light italic lowercase text-white/60 tracking-normal">It lies in the primary circuit of a nuclear reactor.</span>
               </h3>
             </div>
@@ -160,13 +208,13 @@ export const About = () => {
             <div className="editorial-line w-[10vw] h-[1px] bg-white/40 origin-left" />
 
             <div className="overflow-hidden mouse-parallax" ref={(el) => { textRefs.current[4] = el; }}>
-              <p className="font-sans text-xl md:text-2xl lg:text-3xl leading-[1.4] text-white/80 font-medium">
+              <p className="font-sans text-lg sm:text-xl md:text-2xl lg:text-3xl leading-[1.4] text-white/80 font-medium">
                 As a former diagnostics specialist for 6-9 kV protections at the Dukovany Nuclear Power Plant, I was trained in an environment with zero tolerance for failure.
               </p>
             </div>
 
             <div className="overflow-hidden mouse-parallax" ref={(el) => { textRefs.current[5] = el; }}>
-              <p className="font-sans text-lg md:text-xl leading-[1.6] text-white/50">
+              <p className="font-sans text-base sm:text-lg md:text-xl leading-[1.6] text-white/50">
                 I do not just write code. I engineer digital infrastructure. I bring the rigorous mindset of Root Cause Analysis and systematic problem-solving into frontend development, integrating complex WebGL experiences and AI-driven architectures with uncompromising stability.
               </p>
             </div>
