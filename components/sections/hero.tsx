@@ -85,10 +85,11 @@ export const Hero = () => {
         ref={nameRef}
         className="relative font-sans font-black tracking-tighter leading-[1] uppercase text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.15)] text-center will-change-transform w-full flex flex-col items-center opacity-0 py-4"
       >
-        <span className="block text-[clamp(2.5rem,8vw,6rem)] sm:text-[clamp(3rem,9vw,7rem)] md:text-[clamp(5rem,8.5vw,10rem)] whitespace-nowrap">
+        {/* ZMĚNĚNO: clamp(1.75rem,...) pro mobily zajistí, že se jméno nikdy neulomí */}
+        <span className="block text-[clamp(1.75rem,9vw,6rem)] sm:text-[clamp(3rem,9vw,7rem)] md:text-[clamp(5rem,8.5vw,10rem)] whitespace-nowrap">
           TOMÁŠ
         </span>
-        <span className="block text-[clamp(2.5rem,8vw,6rem)] sm:text-[clamp(3rem,9vw,7rem)] md:text-[clamp(5rem,8.5vw,10rem)] text-white/90 whitespace-nowrap">
+        <span className="block text-[clamp(1.75rem,9vw,6rem)] sm:text-[clamp(3rem,9vw,7rem)] md:text-[clamp(5rem,8.5vw,10rem)] text-white/90 whitespace-nowrap">
           KRATOCHVÍL
         </span>
       </h1>

@@ -33,6 +33,7 @@ const MobileMenuOverlay = ({
   const overlayRef = useRef<HTMLDivElement>(null);
   const navItemsRef = useRef<HTMLDivElement>(null);
   const lenis = useLenis();
+  const { language, toggleLanguage } = useLanguage(); // PŘIDÁNO: Napojení na jazyk
 
   useEffect(() => {
     if (!overlayRef.current) return;
@@ -96,32 +97,42 @@ const MobileMenuOverlay = ({
       style={{ clipPath: "circle(0% at calc(100% - 40px) 40px)" }}
     >
       {/* Navigation Links */}
-      <nav ref={navItemsRef} className="flex flex-col items-center gap-8">
+      <nav ref={navItemsRef} className="flex flex-col items-center gap-6 sm:gap-8">
         {NAV_ITEMS.map((item, i) => (
           <button
             key={item.label}
             onClick={() => handleNavClick(item.id)}
-            className="mobile-nav-item group relative overflow-hidden py-2"
+            className="mobile-nav-item group relative overflow-hidden py-1"
           >
-            <span className="font-syne font-black text-5xl sm:text-6xl uppercase tracking-tighter text-white transition-transform duration-500 group-hover:translate-y-[-110%] block">
+            {/* ZMĚNĚNO: Výrazně zmenšeny fonty z 5xl na text-4xl / 5xl pro mobily */}
+            <span className="font-syne font-black text-4xl sm:text-5xl uppercase tracking-tighter text-white transition-transform duration-500 group-hover:translate-y-[-110%] block">
               {item.label}
             </span>
-            <span className="absolute top-0 left-0 w-full text-center font-instrument italic text-5xl sm:text-6xl lowercase text-white/80 translate-y-[110%] transition-transform duration-500 group-hover:translate-y-0">
+            <span className="absolute top-0 left-0 w-full text-center font-instrument italic text-4xl sm:text-5xl lowercase text-white/80 translate-y-[110%] transition-transform duration-500 group-hover:translate-y-0">
               {item.label}
             </span>
-            <span className="absolute -left-8 top-1/2 -translate-y-1/2 font-mono text-[10px] text-white/30 tracking-widest">
+            <span className="absolute -left-6 top-1/2 -translate-y-1/2 font-mono text-[9px] text-white/30 tracking-widest">
               0{i + 1}
             </span>
           </button>
         ))}
       </nav>
 
-      {/* Footer info */}
-      <div className="mobile-nav-footer absolute bottom-12 left-0 right-0 flex justify-center">
-        <div className="flex flex-col items-center gap-3 text-white/40">
-          <span className="font-mono text-[10px] tracking-[0.3em] uppercase">System Architect</span>
-          <div className="w-12 h-[1px] bg-white/20" />
-          <span className="font-mono text-[9px] tracking-[0.2em]">Czech Republic</span>
+      {/* Footer info + Jazyk */}
+      <div className="mobile-nav-footer absolute bottom-12 left-0 right-0 flex flex-col items-center gap-6">
+        {/* PŘIDÁNO: Tlačítko pro změnu jazyka přímo v mobilním menu */}
+        <button 
+          onClick={toggleLanguage}
+          className="flex items-center gap-2 px-4 py-2 border border-white/20 rounded-full font-mono text-[10px] tracking-widest uppercase text-white hover:bg-white/10 transition-colors"
+        >
+          <Globe className="w-3 h-3 animate-[spin_8s_linear_infinite]" />
+          <span>{language === "cs" ? "CZECH" : "ENGLISH"}</span>
+        </button>
+
+        <div className="flex flex-col items-center gap-2 text-white/40">
+          <span className="font-mono text-[9px] tracking-[0.3em] uppercase">System Architect</span>
+          <div className="w-8 h-[1px] bg-white/20" />
+          <span className="font-mono text-[8px] tracking-[0.2em]">Czech Republic</span>
         </div>
       </div>
     </div>
@@ -255,8 +266,7 @@ export const Header = () => {
     <>
       <header 
         ref={containerRef} 
-        className="fixed top-0 left-0 w-full px-6 py-8 md:px-12 md:py-10 flex justify-between items-start z-[100] text-white pointer-events-none mix-blend-difference"
-      >
+        className="fixed top-0 left-0 w-full px-6 py-8 md:px-12 md:py-10 flex justify-between items-start z-[200] text-white pointer-events-none mix-blend-difference">
         <div className="flex flex-col gap-1.5 pointer-events-auto">
           <Link 
             href="/" 

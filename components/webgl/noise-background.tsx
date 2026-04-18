@@ -3,6 +3,7 @@
 import { useRef, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { useMobile } from "@/hooks/use-mobile"; // PŘIDÁNO: Detekce zařízení
 
 // Simplex 3D noise GLSL
 const simplexNoise = `
@@ -83,14 +84,9 @@ const vertexShader = `
 const fragmentShader = `
   ${simplexNoise}
   
-  uniform float uTime;
-  uniform vec2 uResolution;
-  uniform float uScale;
-  uniform float uBias1;
-  uniform float uBias2;
-  uniform vec3 uColor1;
   uniform vec3 uColor2;
   uniform vec3 uAccent;
+  uniform float uIsMobile; // PŘIDÁNO: Přepínač z Reactu
   
   varying vec2 vUv;
   
@@ -101,12 +97,16 @@ const fragmentShader = `
     vec2 pos = uv * uScale;
     pos.x *= uResolution.x / uResolution.y;
     
-    // Layered noise
-    float n1 = snoise(vec3(pos * 1.0, uTime * 0.08)) * uBias1;
-    float n2 = snoise(vec3(pos * 2.0 + 100.0, uTime * 0.05)) * uBias2;
-    float n3 = snoise(vec3(pos * 4.0 + 200.0, uTime * 0.03)) * 0.3;
+    float noise = 0.0;
     
-    float noise = n1 + n2 + n3;
+    // ZMĚNA: Těžká matematika se spustí JEN na desktopu. 
+    // Na mobilu zůstane noise = 0.0 (čistý gradient).
+    if (uIsMobile < 0.5) {
+      float n1 = snoise(vec3(pos * 1.0, uTime * 0.08)) * uBias1;
+      float n2 = snoise(vec3(pos * 2.0 + 100.0, uTime * 0.05)) * uBias2;
+      float n3 = snoise(vec3(pos * 4.0 + 200.0, uTime * 0.03)) * 0.3;
+      noise = n1 + n2 + n3;
+   }
     
     // Smooth gradient blend
     float gradient = smoothstep(-0.8, 0.8, noise);
@@ -126,9 +126,11 @@ export function NoiseBackground() {
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const { viewport } = useThree();
+  const isMobile = useMobile(); // PŘIDÁNO: Volání hooku
 
   const uniforms = useMemo(
     () => ({
+      uIsMobile: { value: isMobile ? 1.0 : 0.0 }, // PŘIDÁNO: Předání do GPU
       uTime: { value: 0 },
       uResolution: { value: new THREE.Vector2(1, 1) },
       uScale: { value: 3.0 },
@@ -143,6 +145,7 @@ export function NoiseBackground() {
 
   useFrame((state) => {
     if (materialRef.current) {
+      materialRef.current.uniforms.uIsMobile.value = isMobile ? 1.0 : 0.0; // PŘIDÁNO: Dynamický update
       materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
       materialRef.current.uniforms.uResolution.value.set(
         viewport.width,
