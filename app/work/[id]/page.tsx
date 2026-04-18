@@ -11,19 +11,19 @@ if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
 // Lokální databáze obohacená o VŠECHNY tvé projekty
 const getProjectData = (slug: string) => {
-  // ZMĚNĚNO: Normalizujeme slug, aby chytil obě varianty z URL
   const normalizedSlug = slug.toLowerCase();
+  
   if (normalizedSlug === "shu-xien-lou" || normalizedSlug === "shuxianglou") {
     return {
       title: "SHU-XIEN-LOU",
       brandColor: "transparent", 
       textColor: "#FFFFFF",
       role: "System Architecture // WebGL UI",
-      challenge: "Transformovat statickou prezentaci tradiční restaurace do hardwarově akcelerovaného digitálního zážitku. Cílem bylo absolutně plynulé rozhraní bez kompromisů v rychlosti načítání.",
-      approach: "Aplikovali jsme inženýrskou 'Zero-error' metodiku. Architektura je postavena na Next.js 16 s Turbopackem. Pro fyziku pohybu jsme propojili GSAP s Lenis smooth scrollem. Prostorová hloubka a částicové efekty jsou řízeny přes React Three Fiber (WebGL), zatímco UI komponenty využívají bezbariérové Radix primitiva.",
+      challenge: "Převést statickou prezentaci tradiční restaurace na hardwarově akcelerovaný digitální zážitek. Cílem bylo absolutně plynulé rozhraní bez kompromisů v rychlosti načítání – design, který dýchá, ale na který se nečeká.",
+      approach: "Aplikoval jsem svůj inženýrský přístup. Jádro běží na Next.js 16, zatímco fyziku pohybu a 3D částicové efekty řídí fúze GSAP a React Three Fiber. Celé uživatelské rozhraní stojí na bezbariérových Radix komponentách pro zajištění maximální stability.",
       techStack: ["Next.js", "React", "Three.js / WebGL", "GSAP", "Lenis", "Tailwind CSS"],
       image: "/shu-xien-glou.vercel.app_.png",
-      liveUrl: "https://www.shuxianglou.cz/" // Doplň reálný odkaz
+      liveUrl: "https://www.shuxianglou.cz/" 
     };
   }
   
@@ -33,11 +33,11 @@ const getProjectData = (slug: string) => {
       brandColor: "transparent", 
       textColor: "#FFFFFF",
       role: "UI Engineering // Frontend",
-      challenge: "Vytvořit nekompromisní digitální prezentaci pro prémiový barbershop. Systém musel vyzařovat luxus, maskulinitu a fungovat bleskově na mobilních zařízeních.",
-      approach: "Postavili jsme temný, vysoce kontrastní design systém s plynulými mikrointerakcemi. Optimalizace LCP (Largest Contentful Paint) zajistila okamžité načítání velkých fotografií přes Next/Image, zatímco GSAP řídí hladký tok obsahu.",
+      challenge: "Navrhnout nekompromisní digitální identitu pro prémiový barbershop. Systém musel vizuálně vyzařovat luxus a maskulinitu, ale technicky fungovat bleskově i na slabších mobilních sítích.",
+      approach: "Vytvořil jsem temný, vysoce kontrastní design systém s důrazem na mikrointerakce. Brutální optimalizace LCP (Largest Contentful Paint) zajistila okamžité načtení velkých fotek, zatímco GSAP hladce diriguje tok obsahu.",
       techStack: ["Next.js", "React", "GSAP", "Tailwind CSS", "Framer Motion"],
-      image: "/kingsbarber-silk.vercel.app_.png", // Tvůj obrázek z public složky
-      liveUrl: "https://kingsbarber-silk.vercel.app" // Doplň reálný odkaz
+      image: "/kingsbarber-silk.vercel.app_.png", 
+      liveUrl: "https://kingsbarber-silk.vercel.app" 
     };
   }
 
@@ -47,9 +47,9 @@ const getProjectData = (slug: string) => {
     brandColor: "transparent", 
     textColor: "#ffffff",
     role: "System Architect // R&D",
-    challenge: "Od nuly postavit komplexní SaaS platformu, která integruje umělou inteligenci do procesu vývoje a testování.",
-    approach: "Místo manuálního psaní kódu jsme využili precizní prompt engineering k budování frontend architektury a extrémně rychlému iterování.",
-    techStack: ["React", "AI Prompting", "Node.js", "Security"],
+    challenge: "Architektura a kompletní vývoj masivní SaaS platformy od nuly. Cílem bylo postavit škálovatelný systém s hlubokou integrací 3D prostředí a kinematických animací.",
+    approach: "Místo tradičního ručního psaní kódu jsem využil pokročilou AI orchestraci pro rapidní iteraci frontend architektury. Výsledkem je extrémně rychlý vývojový cyklus doručující absolutní stabilitu a čistý kód.",
+    techStack: ["Next.js", "React", "Three.js", "AI Orchestration", "Node.js"],
     image: "/aion.png", 
     liveUrl: "#" 
   };

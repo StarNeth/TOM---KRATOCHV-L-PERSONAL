@@ -16,7 +16,7 @@ const DICTIONARY = {
     titlePart2: "Systems.",
     projects: [
       { id: "01", title: "ShuXiangLou", role: "Interactive Web", image: "/shu-xien-glou.vercel.app_.png", brandColor: "#050505", slug: "ShuXiangLou", actionText: "Explore Project" },
-      { id: "02", title: "Kings Barber", role: "Digital Presentation", image: "/kings-barber.png", brandColor: "#0a0a0a", slug: "kings-barber", actionText: "Explore Project" },
+      { id: "02", title: "Kings Barber", role: "Digital Presentation", image: "/kingsbarber-silk.vercel.app_.png", brandColor: "#0a0a0a", slug: "kings-barber", actionText: "Explore Project" },
       { id: "03", title: "Project Aion", role: "SaaS R&D", image: "/aion.png", brandColor: "#111111", slug: "aion", actionText: "View Details" },
     ]
   },
