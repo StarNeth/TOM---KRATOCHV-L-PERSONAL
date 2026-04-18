@@ -7,6 +7,7 @@ import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger"; 
 import { useLenis } from "lenis/react";
 import { Globe, Activity, Circle } from "lucide-react";
+import { useLanguage } from "@/components/navigation/language-toggle";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(useGSAP, ScrollTrigger);
@@ -169,6 +170,9 @@ export const Header = () => {
   const containerRef = useRef<HTMLElement>(null);
   const lenis = useLenis();
   
+  // ZMĚNĚNO: Přidání hooku pro jazyk
+  const { language, toggleLanguage } = useLanguage();
+  
   const [time, setTime] = useState<string>("00:00:00");
   const [scrollProg, setScrollProg] = useState<number>(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -278,10 +282,14 @@ export const Header = () => {
 
           {/* Desktop system info */}
           <div className="sys-element hidden md:flex flex-wrap justify-end items-center gap-x-5 gap-y-2 font-mono text-[10px] tracking-[0.2em] text-white uppercase drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]">
-            <div className="flex items-center gap-1.5">
+            {/* ZMĚNĚNO: Div nahrazen tlačítkem. Dynamicky zobrazuje EN/CS a spouští toggleLanguage */}
+            <button 
+              onClick={toggleLanguage}
+              className="flex items-center gap-1.5 hover:opacity-60 transition-opacity cursor-pointer"
+            >
               <Globe className="w-3 h-3 animate-[spin_8s_linear_infinite]" />
-              <span>CZECH</span>
-            </div>
+              <span>{language === "cs" ? "CZECH" : "ENGLISH"}</span>
+            </button>
             <div className="flex items-center gap-1.5">
               <Circle className="w-1.5 h-1.5 fill-white animate-pulse" />
               <span>{time}</span>

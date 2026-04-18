@@ -5,8 +5,22 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
+import { useLanguage } from "@/components/navigation/language-toggle"; // PŘIDÁNO
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger, useGSAP);
+
+const DICTIONARY = {
+  en: {
+    sequence: "Initiate Sequence",
+    copied: "[ Copied to clipboard ]",
+    clickHint: "Click to copy"
+  },
+  cs: {
+    sequence: "Zahájit Sekvenci",
+    copied: "[ Zkopírováno do schránky ]",
+    clickHint: "Kliknutím zkopíruješ"
+  }
+};
 
 const socials = [
   { label: "LinkedIn", href: "https://www.linkedin.com/in/tomas-kratochvil/" },
@@ -15,6 +29,8 @@ const socials = [
 ];
 
 export const Contact = () => {
+  const { language } = useLanguage(); // PŘIDÁNO
+  const t = DICTIONARY[language]; // PŘIDÁNO
   const sectionRef = useRef<HTMLElement>(null);
   const emailRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
@@ -71,7 +87,7 @@ export const Contact = () => {
         <div className="contact-reveal flex items-center justify-center gap-4 sm:gap-6 mb-8 sm:mb-12 opacity-50">
           <span className="text-[10px] font-mono tracking-[0.3em] uppercase">04</span>
           <div className="w-8 sm:w-12 md:w-24 h-[1px] bg-white/30" />
-          <span className="text-[10px] font-mono tracking-[0.3em] uppercase">Initiate Sequence</span>
+          <span className="text-[10px] font-mono tracking-[0.3em] uppercase">{t.sequence}</span>
         </div>
 
         {/* Email (Main CTA) - Responsive Typography */}
@@ -83,8 +99,8 @@ export const Contact = () => {
           ref={emailRef}
         >
           <div className="copy-feedback absolute left-1/2 -translate-x-1/2 -top-12 sm:-top-16 opacity-0 pointer-events-none z-30">
-            <div className="px-4 sm:px-5 py-2 bg-white text-black font-mono text-[10px] sm:text-xs tracking-[0.2em] uppercase rounded-none drop-shadow-2xl whitespace-nowrap">
-              [ Copied to clipboard ]
+          <div className="px-4 sm:px-5 py-2 bg-white text-black font-mono text-[10px] sm:text-xs tracking-[0.2em] uppercase rounded-none drop-shadow-2xl whitespace-nowrap">
+              {t.copied}
             </div>
           </div>
 
@@ -102,7 +118,7 @@ export const Contact = () => {
           
           {/* Click hint */}
           <span className="block mt-4 font-mono text-[9px] sm:text-[10px] tracking-[0.3em] text-white/30 uppercase opacity-0 group-hover:opacity-100 transition-opacity">
-            Click to copy
+            {t.clickHint}
           </span>
         </div>
 

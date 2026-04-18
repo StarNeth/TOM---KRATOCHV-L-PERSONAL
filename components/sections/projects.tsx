@@ -5,16 +5,36 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
 import Image from "next/image";
+import { useLanguage } from "@/components/navigation/language-toggle"; // PŘIDÁNO
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
-const projectsData = [
-  { id: "01", title: "ShuXiangLou", role: "Interactive Web", image: "/shu-xien-glou.vercel.app_.png", brandColor: "#050505", slug: "ShuXiangLou", actionText: "Explore Project" },
-  { id: "02", title: "Kings Barber", role: "Digital Presentation", image: "/kings-barber.png", brandColor: "#0a0a0a", slug: "kings-barber", actionText: "Explore Project" },
-  { id: "03", title: "Project Aion", role: "SaaS R&D", image: "/aion.png", brandColor: "#111111", slug: "aion", actionText: "View Details" },
-];
+const DICTIONARY = {
+  en: {
+    sectionLabel: "02 // Selected Work",
+    titlePart1: "Proven",
+    titlePart2: "Systems.",
+    projects: [
+      { id: "01", title: "ShuXiangLou", role: "Interactive Web", image: "/shu-xien-glou.vercel.app_.png", brandColor: "#050505", slug: "ShuXiangLou", actionText: "Explore Project" },
+      { id: "02", title: "Kings Barber", role: "Digital Presentation", image: "/kings-barber.png", brandColor: "#0a0a0a", slug: "kings-barber", actionText: "Explore Project" },
+      { id: "03", title: "Project Aion", role: "SaaS R&D", image: "/aion.png", brandColor: "#111111", slug: "aion", actionText: "View Details" },
+    ]
+  },
+  cs: {
+    sectionLabel: "02 // Vybraná Práce",
+    titlePart1: "Ověřené",
+    titlePart2: "Systémy.",
+    projects: [
+      { id: "01", title: "ShuXiangLou", role: "Interaktivní Web", image: "/shu-xien-glou.vercel.app_.png", brandColor: "#050505", slug: "ShuXiangLou", actionText: "Prozkoumat Projekt" },
+      { id: "02", title: "Kings Barber", role: "Digitální Prezentace", image: "/kings-barber.png", brandColor: "#0a0a0a", slug: "kings-barber", actionText: "Prozkoumat Projekt" },
+      { id: "03", title: "Project Aion", role: "SaaS Výzkum", image: "/aion.png", brandColor: "#111111", slug: "aion", actionText: "Zobrazit Detaily" },
+    ]
+  }
+};
 
 export const Projects = () => {
+  const { language } = useLanguage(); // PŘIDÁNO
+  const t = DICTIONARY[language]; // PŘIDÁNO
   const sectionRef = useRef<HTMLElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
@@ -46,14 +66,19 @@ export const Projects = () => {
     <section ref={sectionRef} id="work" className="relative w-full h-[100svh] bg-transparent overflow-hidden">
       <div ref={trackRef} className="flex h-full items-center px-[5vw] md:px-[10vw] gap-[8vw] md:gap-[15vw] will-change-transform py-20">
         
-        <div className="flex-shrink-0 w-[90vw] md:w-[40vw] pl-4 md:pl-0 max-w-[100vw]">
-          <span className="font-mono text-[10px] tracking-[0.5em] text-white/40 uppercase block mb-6">02 // Selected Work</span>
-          <h2 className="font-syne font-black text-5xl sm:text-6xl md:text-9xl uppercase tracking-tighter leading-[0.8] text-white break-words">
-            Proven <br /> <span className="font-instrument italic font-light lowercase">Systems.</span>
+      {/* ZMĚNĚNO: Šířka md:w-[50vw] pro víc prostoru a odstraněno break-words */}
+        <div className="flex-shrink-0 w-[90vw] md:w-[55vw] pl-4 md:pl-0 max-w-[100vw]">
+          <span className="font-mono text-[10px] tracking-[0.5em] text-white/40 uppercase block mb-6">{t.sectionLabel}</span>
+          {/* ZMĚNĚNO: text-[clamp(...)] pro fluidní velikost a leading na [0.9] kvůli háčkům */}
+          <h2 className="font-syne font-black text-[clamp(2.5rem,10vw,5rem)] md:text-[clamp(5rem,10vw,10rem)] uppercase tracking-tighter leading-[0.9] text-white whitespace-pre-wrap">
+            {t.titlePart1} <br /> 
+            <span className="font-instrument italic font-light lowercase">
+              {t.titlePart2}
+            </span>
           </h2>
         </div>
 
-        {projectsData.map((p, index) => (
+        {t.projects.map((p, index) => (
           <Link 
             key={p.id} 
             href={`/work/${p.slug}`} 

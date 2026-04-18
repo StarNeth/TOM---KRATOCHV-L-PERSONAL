@@ -8,8 +8,39 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useMobile } from "@/hooks/use-mobile";
+import { useLanguage } from "@/components/navigation/language-toggle"; // PŘIDÁNO
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger, useGSAP);
+
+// SLOVNÍK (DICTIONARY) PRO TUTO SEKCI
+const DICTIONARY = {
+  en: {
+    sectionLabel: "01 / Architecture",
+    mainTitlePart1: "Engineering",
+    mainTitlePart2: "precision.",
+    methodologyTitle: "Methodology",
+    methodologyPoints: ["Root Cause Analysis.", "Zero-Error Tolerance.", "Systematic Diagnostics."],
+    capTitle: "Capabilities",
+    capabilities: ["Frontend Architecture", "WebGL / 3D Experiences", "UI/UX Engineering", "OSINT & Security"],
+    narrativeTitlePart1: "My background does not lie in traditional design agencies.",
+    narrativeTitlePart2: "It lies in the primary circuit of a nuclear reactor.",
+    paragraph1: "As a former diagnostics specialist for 6-9 kV protections at the Dukovany Nuclear Power Plant, I was trained in an environment with zero tolerance for failure.",
+    paragraph2: "I do not just write code. I engineer digital infrastructure. I bring the rigorous mindset of Root Cause Analysis and systematic problem-solving into frontend development, integrating complex WebGL experiences and AI-driven architectures with uncompromising stability."
+  },
+  cs: {
+    sectionLabel: "01 / Architektura",
+    mainTitlePart1: "Inženýrská",
+    mainTitlePart2: "přesnost.",
+    methodologyTitle: "Metodologie",
+    methodologyPoints: ["Analýza kořenových příčin.", "Nulová tolerance chyb.", "Systematická diagnostika."],
+    capTitle: "Schopnosti",
+    capabilities: ["Architektura Frontendu", "WebGL / 3D Zážitky", "UI/UX Inženýrství", "OSINT & Bezpečnost"],
+    narrativeTitlePart1: "Mé zázemí neleží v tradičních designových agenturách.",
+    narrativeTitlePart2: "Leží v primárním okruhu jaderného reaktoru.",
+    paragraph1: "Jako bývalý specialista diagnostiky ochran 6-9 kV v Jaderné elektrárně Dukovany jsem byl vycvičen v prostředí s absolutně nulovou tolerancí k selhání.",
+    paragraph2: "Nepíšu jen kód. Projektuji digitální infrastrukturu. Do frontendového vývoje přináším striktní analytické myšlení, kde integruji komplexní WebGL zážitky a architektury řízené umělou inteligencí do nekompromisně stabilních systémů."
+  }
+};
 
 // Luxurious Dark Glass Object
 const DarkGlassShape = () => {
@@ -95,6 +126,8 @@ const Lazy3DBackground = () => {
 };
 
 export const About = () => {
+  const { language } = useLanguage(); // PŘIDÁNO
+  const t = DICTIONARY[language]; // PŘIDÁNO
   const containerRef = useRef<HTMLElement>(null);
   const textRefs = useRef<(HTMLDivElement | null)[]>([]);
   const isMobile = useMobile();
@@ -159,11 +192,11 @@ export const About = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 sm:mb-24 md:mb-32">
           <div className="overflow-hidden" ref={(el) => { textRefs.current[0] = el; }}>
             <span className="font-mono text-xs tracking-[0.2em] text-white/40 uppercase block mb-4">
-              01 / Architecture
+              {t.sectionLabel}
             </span>
             <h2 className="font-syne font-black text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tighter uppercase leading-[0.9]">
-              Engineering <br />
-              <span className="font-instrument font-light italic lowercase text-white/80 tracking-normal">precision.</span>
+              {t.mainTitlePart1} <br />
+              <span className="font-instrument font-light italic lowercase text-white/80 tracking-normal">{t.mainTitlePart2}</span>
             </h2>
           </div>
         </div>
@@ -177,20 +210,19 @@ export const About = () => {
           <div className="lg:col-span-4 flex flex-col gap-8 sm:gap-12">
             <div className="lg:sticky lg:top-40 flex flex-col gap-8 sm:gap-12 mouse-parallax">
               <div className="overflow-hidden" ref={(el) => { textRefs.current[1] = el; }}>
-                <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 uppercase block mb-4">Methodology</span>
+                <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 uppercase block mb-4">{t.methodologyTitle}</span>
                 <p className="font-sans text-sm md:text-base leading-relaxed text-white/70">
-                  Root Cause Analysis. <br />
-                  Zero-Error Tolerance. <br />
-                  Systematic Diagnostics.
+                  {t.methodologyPoints.map((point, i) => (
+                    <span key={i}>{point} <br /></span>
+                  ))}
                 </p>
               </div>
               <div className="overflow-hidden" ref={(el) => { textRefs.current[2] = el; }}>
-                <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 uppercase block mb-4">Capabilities</span>
+                <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 uppercase block mb-4">{t.capTitle}</span>
                 <ul className="font-sans text-sm md:text-base leading-relaxed text-white/70 flex flex-col gap-2">
-                  <li>Frontend Architecture</li>
-                  <li>WebGL / 3D Experiences</li>
-                  <li>UI/UX Engineering</li>
-                  <li>OSINT & Security</li>
+                  {t.capabilities.map((cap, i) => (
+                    <li key={i}>{cap}</li>
+                  ))}
                 </ul>
               </div>
             </div>
@@ -201,7 +233,7 @@ export const About = () => {
             
             <div className="overflow-hidden mouse-parallax" ref={(el) => { textRefs.current[3] = el; }}>
               <h3 className="font-syne font-bold text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-[1.2] tracking-tight uppercase">
-                My background does not lie in traditional design agencies. <span className="font-instrument font-light italic lowercase text-white/60 tracking-normal">It lies in the primary circuit of a nuclear reactor.</span>
+                {t.narrativeTitlePart1} <span className="font-instrument font-light italic lowercase text-white/60 tracking-normal">{t.narrativeTitlePart2}</span>
               </h3>
             </div>
 
@@ -209,13 +241,13 @@ export const About = () => {
 
             <div className="overflow-hidden mouse-parallax" ref={(el) => { textRefs.current[4] = el; }}>
               <p className="font-sans text-lg sm:text-xl md:text-2xl lg:text-3xl leading-[1.4] text-white/80 font-medium">
-                As a former diagnostics specialist for 6-9 kV protections at the Dukovany Nuclear Power Plant, I was trained in an environment with zero tolerance for failure.
+                {t.paragraph1}
               </p>
             </div>
 
             <div className="overflow-hidden mouse-parallax" ref={(el) => { textRefs.current[5] = el; }}>
               <p className="font-sans text-base sm:text-lg md:text-xl leading-[1.6] text-white/50">
-                I do not just write code. I engineer digital infrastructure. I bring the rigorous mindset of Root Cause Analysis and systematic problem-solving into frontend development, integrating complex WebGL experiences and AI-driven architectures with uncompromising stability.
+                {t.paragraph2}
               </p>
             </div>
 

@@ -4,8 +4,20 @@ import { useRef, useMemo } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
+import { useLanguage } from "@/components/navigation/language-toggle"; // PŘIDÁNO
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
+
+const DICTIONARY = {
+  en: {
+    title: "Architecture",
+    subtitle: "[ Tap nodes to disrupt the system ]"
+  },
+  cs: {
+    title: "Architektura",
+    subtitle: "[ Klikni na uzly pro narušení systému ]"
+  }
+};
 
 const skillsData = [
   "AI WEB ARCHITECT", "UI/UX ENGINEERING", "FRONTEND SYSTEMS",
@@ -29,6 +41,8 @@ const mobilePositions = [
 ];
 
 export const Capabilities = () => {
+  const { language } = useLanguage(); // PŘIDÁNO
+  const t = DICTIONARY[language]; // PŘIDÁNO
   const sectionRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<HTMLDivElement[]>([]);
@@ -105,32 +119,31 @@ export const Capabilities = () => {
       
       {/* Nápis - Čistý, ukotvený nahoře */}
       <div className="cap-title flex flex-col items-center mb-12 pointer-events-none px-4 text-center w-full z-20">
-        <h2 className="font-syne font-bold text-4xl md:text-7xl uppercase tracking-tighter drop-shadow-lg">Architecture</h2>
+        <h2 className="font-syne font-bold text-4xl md:text-7xl uppercase tracking-tighter drop-shadow-lg">{t.title}</h2>
         <p className="font-mono text-[9px] md:text-xs tracking-[0.3em] uppercase text-white/50 mt-4">
-          [ Tap nodes to disrupt the system ]
+          {t.subtitle}
         </p>
       </div>
 
       {/* Skleněný kontejner - Vrací webu strukturu */}
+      {/* Box */}
       <div 
         ref={containerRef} 
-        className="relative w-[92vw] md:w-[85vw] max-w-6xl h-[80vh] bg-black/20 backdrop-blur-xl border border-white/10 rounded-[2rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden"
+        className="relative w-[92vw] md:w-[85vw] max-w-6xl h-auto min-h-[70vh] py-12 bg-black/20 backdrop-blur-xl border border-white/10 rounded-[2rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-wrap justify-center items-center gap-4 md:gap-0"
       >
-        {/* Jemná CSS mřížka na pozadí boxu pro "Architect" look */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-
         {skillsData.map((skill, i) => {
-          // Na mobilu to poskládáme pod sebe, na PC rozhodíme po ploše
           const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-          const pos = isMobile ? mobilePositions[i] : desktopPositions[i];
+          // Desktop má pevné pozice, mobil používá bezpečný CSS Flexbox
+          const style = isMobile 
+            ? { position: "relative" as const } 
+            : { position: "absolute" as const, left: `${desktopPositions[i].x}%`, top: `${desktopPositions[i].y}%`, transform: "translate(-50%, -50%)" };
 
           return (
             <div
               key={i}
               ref={(el) => { nodesRef.current[i] = el!; }}
-              className="absolute cursor-pointer group"
-              // Použijeme pevnou pozici, GSAP bude animovat jen Translate (kvůli výkonu)
-              style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -50%)" }}
+              className="cursor-pointer group"
+              style={style}
               onMouseMove={(e) => handleMouseMove(e, i)}
               onMouseLeave={() => handleMouseLeave(i)}
               onMouseDown={(e) => handleClick(e, i)}

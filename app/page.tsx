@@ -15,24 +15,14 @@ const WebGLScene = dynamic(
 );
 
 export default function Home() {
-  const [canRenderWebGL, setCanRenderWebGL] = useState(false);
-
   useEffect(() => {
     window.scrollTo(0, 0);
-
-    // DÁME PRELOADERU ČAS (1.5 sekundy), ABY SE V KLIDU ROZBĚHL
-    // Než mu do toho hodíme granát v podobě WebGL kompilace.
-    const timer = setTimeout(() => {
-      setCanRenderWebGL(true);
-    }, 1500);
-
-    return () => clearTimeout(timer);
   }, []);
 
   return (
     <>
-      {/* WebGL se namountuje až po 1.5s */}
-      {canRenderWebGL && <WebGLScene />}
+      {/* ZMĚNĚNO: Žádný umělý delay. WebGL startuje okamžitě, což řeší černou obrazovku při návratu z projektů. */}
+      <WebGLScene />
 
       <main className="relative w-full text-white z-10">
         <Header />

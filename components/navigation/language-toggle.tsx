@@ -1,26 +1,45 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 
-// 1. ROZŠÍŘÍME TYP O FUNKCI 't'
-type LanguageContextType = {
-  language: "cs" | "en";
-  setLanguage: (lang: "cs" | "en") => void;
-  t: (dict: { cs: any; en: any }) => any; // Funkce t přijme objekt s cs/en a vrátí správnou verzi
-};
+type Language = "en" | "cs";
+
+interface LanguageContextType {
+  language: Language;
+  toggleLanguage: () => void;
+  setLanguage: (lang: Language) => void;
+}
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider = ({ children }: { children: React.ReactNode }) => {
-  const [language, setLanguage] = useState<"cs" | "en">("en");
+  const [language, setLanguageState] = useState<Language>("en");
 
-  // 2. DEFINICE FUNKCE t
-  const t = (dict: { cs: any; en: any }) => {
-    return dict[language] || dict["en"]; // Fallback na angličtinu, kdyby čeština chyběla
+  // Bezpečně natáhneme jazyk z paměti až po vykreslení (ochrana proti Hydration Mismatch)
+  useEffect(() => {
+    const savedLang = localStorage.getItem("system_lang") as Language;
+    if (savedLang === "en" || savedLang === "cs") {
+      setLanguageState(savedLang);
+    }
+  }, []);
+
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    localStorage.setItem("system_lang", lang);
   };
 
+  const toggleLanguage = () => {
+    setLanguageState((prev) => {
+      const nextLang = prev === "en" ? "cs" : "en";
+      localStorage.setItem("system_lang", nextLang);
+      return nextLang;
+    });
+  };
+
+  // ZMĚNĚNO: Zásadní oprava! Už NIKDY nevracíme děti bez Provideru.
+  // Komponenty uvnitř (jako Hero) teď vždy najdou svůj kontext.
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, toggleLanguage, setLanguage }}>
       {children}
     </LanguageContext.Provider>
   );
@@ -28,6 +47,8 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
 
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
-  if (!context) throw new Error("useLanguage must be used within LanguageProvider");
+  if (!context) {
+    throw new Error("CRITICAL: useLanguage musí být použit uvnitř LanguageProvideru.");
+  }
   return context;
 };

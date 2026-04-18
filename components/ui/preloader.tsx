@@ -10,46 +10,39 @@ export const Preloader = () => {
   const secondaryElementsRef = useRef<HTMLDivElement>(null);
   
   const [counter, setCounter] = useState(0);
-  const [isFinished, setIsFinished] = useState(false);
-  const [isWebglReady, setIsWebglReady] = useState(false);
-  const [phase, setPhase] = useState<"loading" | "animating">("loading");
+  const [phase, setPhase] = useState<"init" | "loading" | "animating">("init");
+  
+  // ZMĚNA: Defaultně musí být true/false takové, aby preloader blokoval web a nic neprobliklo
+  const [shouldRun, setShouldRun] = useState(true); 
+  const [isFinished, setIsFinished] = useState(false); 
 
-  // 1. ČEKÁME NA SKUTEČNÉ NAČTENÍ (WebGL + Window Load)
   useEffect(() => {
-    const handleReady = () => setIsWebglReady(true);
-    window.addEventListener("webgl-ready", handleReady);
-    
-    // Safety timeout, kdyby WebGL spadlo (aby web nezůstal viset na 99%)
-    const fallback = setTimeout(handleReady, 8000);
-    
-    return () => {
-      window.removeEventListener("webgl-ready", handleReady);
-      clearTimeout(fallback);
-    };
+    // 1. Zabráníme probliknutí a ověříme paměť hned na začátku
+    if (sessionStorage.getItem("preloader_played")) {
+      setShouldRun(false);
+      setIsFinished(true);
+      // Musíme to vystřelit s mikro-zpožděním, aby se Hero stihl namountovat
+      setTimeout(() => window.dispatchEvent(new CustomEvent("preloader-complete")), 50);
+      return;
+    }
+    setPhase("loading");
   }, []);
 
-  // 2. LOGIKA POČÍTADLA (Zastaví se na 99 %, pokud není načteno)
+  // 2. Plynulé počítadlo procent
   useEffect(() => {
-    if (phase !== "loading") return;
+    if (!shouldRun || phase !== "loading") return;
     
     let current = 0;
     let lastTime = performance.now();
     let frameId: number;
-    let isCancelled = false; // Pojistka proti React Strict Mode
 
     const updateCounter = (time: number) => {
-      if (isCancelled) return;
-      
       const delta = Math.min(time - lastTime, 30);
       lastTime = time;
 
-      // ZPOMALENO: Nyní trvá 2.5 sekundy (2500ms) dojet do 99%
-      current += (delta / 2500) * 100;
+      current += (delta / 2500) * 100; // 2.5 vteřiny
       
-      if (current >= 99 && !isWebglReady) {
-        setCounter(99);
-        frameId = requestAnimationFrame(updateCounter);
-      } else if (current >= 100 && isWebglReady) {
+      if (current >= 100) {
         setCounter(100);
         setPhase("animating"); 
       } else {
@@ -59,85 +52,71 @@ export const Preloader = () => {
     };
     
     frameId = requestAnimationFrame(updateCounter);
-    
-    return () => {
-      isCancelled = true;
-      cancelAnimationFrame(frameId);
-    };
-  }, [phase, isWebglReady]);
+    return () => cancelAnimationFrame(frameId);
+  }, [shouldRun, phase]);
 
-  // Zákaz scrollování
   useEffect(() => {
-    if (!isFinished) document.body.style.overflow = "hidden";
-  }, [isFinished]);
+    if (!isFinished && shouldRun) document.body.style.overflow = "hidden";
+  }, [isFinished, shouldRun]);
 
-  // 3. MASTER CHOREOGRAFIE (T & K)
+  // 3. CHOREOGRAFIE: Písmena vzletí, TK se spojí
   useGSAP(() => {
     if (phase !== "animating") return;
 
     const tl = gsap.timeline({
       onComplete: () => {
         document.body.style.overflow = "";
+        sessionStorage.setItem("preloader_played", "true");
         setIsFinished(true);
-        // OPRAVA: Vystřelíme správný event pro tvůj Hero.tsx!
         window.dispatchEvent(new CustomEvent("preloader-complete"));
       }
     });
 
-    // A. Skryjeme procenta a popisky
+    // A. Zmizí procenta a detaily
     tl.to(secondaryElementsRef.current, {
       opacity: 0,
-      y: 20,
-      duration: 0.5,
+      duration: 0.4,
       ease: "power3.inOut"
     });
 
-    // B. Přesuneme celé jméno absolutně na střed obrazovky
-    tl.to(nameWrapperRef.current, {
-      top: "50%",
-      left: "50%",
-      xPercent: -50,
-      yPercent: -50,
-      duration: 1.2,
-      ease: "expo.inOut"
-    }, "-=0.2");
-
-    // C. Skryjeme všechna písmena KROMĚ T a K a smrskneme jejich šířku na 0
+    // B. Písmena vyletí nahoru a fade-outnou JEDNOTLIVĚ
     tl.to(".fade-letter", {
+      y: -100,
       opacity: 0,
+      duration: 0.6,
+      stagger: 0.03, // Každé písmeno vyletí chvíli po tom předchozím
+      ease: "power3.in"
+    }, "+=0.2");
+
+    // C. Písmena "T" a "K" se přisunou k sobě (zrušíme mezeru těch zmizelých písmen)
+    tl.to(".fade-letter", {
       width: 0,
-      marginRight: 0,
       paddingRight: 0,
+      marginRight: 0,
       duration: 0.8,
-      ease: "power3.inOut"
-    }, "-=0.4");
+      ease: "expo.inOut"
+    }, "+=0.1");
+    
+    tl.to(".name-space", { width: 0, duration: 0.8, ease: "expo.inOut" }, "<");
 
-    // Skryjeme mezeru (br) mezi jménem a příjmením, aby se T a K daly vedle sebe
-    tl.to(".name-break", {
-      display: "none",
-      duration: 0
-    }, "-=0.8");
-
-    // D. Opona vyjede nahoru
+    // D. Vytažení opony (celého preloaderu) plynule nahoru
     tl.to(containerRef.current, {
       yPercent: -100,
-      duration: 1,
+      duration: 1.2,
       ease: "expo.inOut"
-    }, "+=0.3"); // Malá pauza, ať si uživatel to "TK" stihne prohlédnout
+    }, "+=0.3");
 
   }, { scope: containerRef, dependencies: [phase] });
 
-  if (isFinished) return null;
+  if (!shouldRun || isFinished) return null;
 
-  // Rozdělení jména pro individuální animaci písmen
   const renderWord = (word: string) => {
     return word.split("").map((char, index) => {
-      // První písmeno necháme (T a K), ostatní dostanou třídu fade-letter
       const isInitial = index === 0;
       return (
         <span 
           key={index} 
-          className={`inline-block overflow-hidden ${isInitial ? 'tk-letter' : 'fade-letter'}`}
+          className={`inline-block overflow-hidden ${isInitial ? 'text-white' : 'fade-letter text-white/90'}`}
         >
           {char}
         </span>
@@ -146,54 +125,45 @@ export const Preloader = () => {
   };
 
   return (
-    <div 
-      ref={containerRef} 
-      className="fixed inset-0 z-[9999] bg-[#f4f4f4] text-[#0a0a0a] pointer-events-none"
-    >
-      {/* Tento wrapper drží jméno. Na začátku je vlevo nahoře (top-6 left-6).
-        GSAP ho pak animuje na top: 50%, left: 50%, translate: -50% -50%
-      */}
+    <div ref={containerRef} className="fixed inset-0 z-[9999] bg-[#020202] text-white pointer-events-auto">
+      
+      {/* Jméno - Zmenšeno a elegantně vycentrováno */}
       <div 
         ref={nameWrapperRef} 
-        className="absolute top-6 left-6 md:top-12 md:left-12 flex flex-col md:flex-row md:gap-4 items-start"
+        className="absolute inset-0 flex items-center justify-center pointer-events-none"
       >
-        <h1 className="font-syne font-black text-[12vw] md:text-[8vw] leading-[0.85] tracking-tighter uppercase m-0 flex flex-wrap">
+        {/* ZMĚNĚNO: Z obřích 12vw na decentní text-4xl / md:text-6xl */}
+        <h1 className="font-syne font-bold text-4xl md:text-6xl tracking-tighter uppercase m-0 flex items-center">
           <div className="flex">
-            {renderWord("Tomáš")}
+            {renderWord("TOMÁŠ")}
           </div>
-          <span className="name-break block w-full md:hidden"></span>
-          <div className="flex md:ml-4">
-            {renderWord("Kratochvíl.")}
+          <span className="name-space w-3 md:w-5 inline-block"></span>
+          <div className="flex">
+            {renderWord("KRATOCHVÍL")}
           </div>
         </h1>
       </div>
 
-      {/* Všechno ostatní, co zmizí (Procenta, texty, čáry) */}
-      <div ref={secondaryElementsRef} className="absolute inset-0 p-6 md:p-12 flex flex-col justify-between">
-        
-        {/* Top Meta Text */}
-        <div className="flex justify-end w-full">
-          <div className="flex gap-4 mt-6 md:mt-8 font-jetbrains text-xs md:text-sm uppercase tracking-widest font-bold opacity-50">
-            <span>Sys.01</span>
-            <span>—</span>
+      <div ref={secondaryElementsRef} className="absolute inset-0 p-6 md:p-12 flex flex-col justify-between pointer-events-none">
+        <div className="flex justify-between w-full">
+          <div className="flex items-center gap-2 opacity-30">
+            <span className="font-mono text-[10px] tracking-[0.3em] uppercase">SYS.01</span>
+          </div>
+          <div className="flex gap-4 font-jetbrains text-xs uppercase tracking-widest font-bold opacity-50">
             <span>System Architect</span>
           </div>
         </div>
 
-        {/* Bottom Counter */}
-        <div className="flex justify-between items-end w-full h-full">
-          <div className="font-jetbrains text-xs md:text-sm uppercase tracking-widest opacity-50 pb-2 md:pb-4">
-            Loading
-            <br />
-            Digital Experience
+        <div className="flex justify-between items-end w-full">
+          <div className="font-jetbrains text-[10px] md:text-xs uppercase tracking-widest opacity-50 pb-2">
+            Loading<br />Digital Experience
           </div>
           
-          <div className="font-jetbrains font-bold text-[22vw] md:text-[16vw] leading-[0.75] flex items-end">
+          <div className="font-jetbrains font-bold text-5xl md:text-7xl leading-none flex items-end">
             {counter.toString().padStart(3, "0")}
-            <span className="font-syne text-[10vw] md:text-[6vw] leading-[1] mb-[1vw] ml-2">%</span>
+            <span className="font-syne text-xl md:text-2xl mb-1 ml-2 opacity-50">%</span>
           </div>
         </div>
-
       </div>
     </div>
   );

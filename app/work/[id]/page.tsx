@@ -11,7 +11,9 @@ if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
 // Lokální databáze obohacená o VŠECHNY tvé projekty
 const getProjectData = (slug: string) => {
-  if (slug === "shu-xien-lou") {
+  // ZMĚNĚNO: Normalizujeme slug, aby chytil obě varianty z URL
+  const normalizedSlug = slug.toLowerCase();
+  if (normalizedSlug === "shu-xien-lou" || normalizedSlug === "shuxianglou") {
     return {
       title: "SHU-XIEN-LOU",
       brandColor: "transparent", 
@@ -107,12 +109,12 @@ export default function ProjectDetail() {
       <div className="page-transition-overlay fixed inset-0 z-[200] bg-[#050505] pointer-events-none" />
       <WebGLScene />
 
-      {/* --- TOP NAVIGACE (Už bez Language Toggleru) --- */}
+      {/* --- TOP NAVIGACE --- */}
       <nav className="fixed top-0 left-0 w-full p-6 md:p-12 z-[100] mix-blend-difference pointer-events-none flex justify-between items-center">
-        {/* ZMĚNĚNO: Použit <a> tag pro vynucení hard-reloadu a reset GSAP stavů na hlavní stránce */}
-        <a href="/" className="font-syne font-bold text-xl pointer-events-auto hover:opacity-70 transition-opacity flex items-center gap-2 text-white">
+        {/* ZMĚNĚNO: Vrácen <Link>. Hard-reload ničil výkon WebGL a dělal záseky. Next.js router to zvládne plynule. */}
+        <Link href="/" className="font-syne font-bold text-xl pointer-events-auto hover:opacity-70 transition-opacity flex items-center gap-2 text-white">
             ← <span className="uppercase text-sm tracking-widest mt-1 font-mono">Archive</span>
-        </a>
+        </Link>
       </nav>
 
       {/* --- HERO SEKCE --- */}
