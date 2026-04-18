@@ -30,8 +30,30 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  
+  // ZBRAŇ HROMADNÉHO NIČENÍ PRO SEO (Krok 3)
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": "Tomáš Kratochvíl",
+    "jobTitle": "System Architect",
+    "url": "https://www.tomaskratochvil.com",
+    "description": "Creative developer crafting digital experiences with zero-error tolerance.",
+    "sameAs": [
+      "https://www.linkedin.com/in/tomas-kratochvil/",
+      "https://github.com/StarNeth"
+    ]
+  };
+
   return (
     <html lang="en" className={`${syne.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} no-scrollbar overflow-x-hidden`}>
+      <head>
+        {/* Vložení JSON-LD přímo do hlavičky pro Google Bota */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body suppressHydrationWarning className="bg-background text-foreground font-sans antialiased cursor-none overflow-x-hidden w-full relative">
         <Preloader />
         <LanguageProvider>
