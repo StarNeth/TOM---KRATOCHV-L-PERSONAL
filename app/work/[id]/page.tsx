@@ -22,7 +22,7 @@ const getProjectData = (slug: string) => {
       challenge: "Převést statickou prezentaci tradiční restaurace na hardwarově akcelerovaný digitální zážitek. Cílem bylo absolutně plynulé rozhraní bez kompromisů v rychlosti načítání – design, který dýchá, ale na který se nečeká.",
       approach: "Aplikoval jsem svůj inženýrský přístup. Jádro běží na Next.js 16, zatímco fyziku pohybu a 3D částicové efekty řídí fúze GSAP a React Three Fiber. Celé uživatelské rozhraní stojí na bezbariérových Radix komponentách pro zajištění maximální stability.",
       techStack: ["Next.js", "React", "Three.js / WebGL", "GSAP", "Lenis", "Tailwind CSS"],
-      image: "/shu-xien-glou.vercel.app_.png",
+      image: "/shu-xien-glou.vercel.app_.webp",
       liveUrl: "https://www.shuxianglou.cz/" 
     };
   }
@@ -36,7 +36,7 @@ const getProjectData = (slug: string) => {
       challenge: "Navrhnout nekompromisní digitální identitu pro prémiový barbershop. Systém musel vizuálně vyzařovat luxus a maskulinitu, ale technicky fungovat bleskově i na slabších mobilních sítích.",
       approach: "Vytvořil jsem temný, vysoce kontrastní design systém s důrazem na mikrointerakce. Brutální optimalizace LCP (Largest Contentful Paint) zajistila okamžité načtení velkých fotek, zatímco GSAP hladce diriguje tok obsahu.",
       techStack: ["Next.js", "React", "GSAP", "Tailwind CSS", "Framer Motion"],
-      image: "/kingsbarber-silk.vercel.app_.png", 
+      image: "/kingsbarber-silk.vercel.app_.webp", 
       liveUrl: "https://kingsbarber-silk.vercel.app" 
     };
   }
@@ -50,7 +50,7 @@ const getProjectData = (slug: string) => {
     challenge: "Architektura a kompletní vývoj masivní SaaS platformy od nuly. Cílem bylo postavit škálovatelný systém s hlubokou integrací 3D prostředí a kinematických animací.",
     approach: "Místo tradičního ručního psaní kódu jsem využil pokročilou AI orchestraci pro rapidní iteraci frontend architektury. Výsledkem je extrémně rychlý vývojový cyklus doručující absolutní stabilitu a čistý kód.",
     techStack: ["Next.js", "React", "Three.js", "AI Orchestration", "Node.js"],
-    image: "/aion.png", 
+    image: "/placeholder.jpg", 
     liveUrl: "#" 
   };
 };

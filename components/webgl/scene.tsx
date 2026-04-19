@@ -87,12 +87,13 @@ const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
 
   const vertexShader = `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position, 1.0); }`;
 
-  // Adaptive Shader: Mobile uses mediump + 2 iterations, Desktop uses highp + 5.
+  // Adaptive Shader s chirurgickým vypnutím myši na mobilu
   const fragmentShader = useMemo(() => `
     #ifdef GL_ES
     precision ${isMobile ? 'mediump' : 'highp'} float;
     #endif
     #define ITERATIONS ${isMobile ? '2' : '3'}
+    #define IS_MOBILE ${isMobile ? '1' : '0'}
     
     uniform float uTime;
     uniform vec2 uResolution;
@@ -116,18 +117,21 @@ const LiquidObsidianMaterial = ({ isMobile }: { isMobile: boolean }) => {
       vec2 p = -1.0 + 2.0 * uv;
       p.x *= uResolution.x / uResolution.y;
 
-      vec2 m = uMouse;
-      m.x *= uResolution.x / uResolution.y;
-      
       vec2 cp = uClickPos;
       cp.x *= uResolution.x / uResolution.y;
 
-      vec2 delta = p - m;
-      float distMouse = length(delta);
-      float mousePower = exp(-distMouse * 6.0); 
-      
-      p = m + rot(mousePower * 1.5) * delta; 
-      p -= normalize(delta + vec2(0.0001)) * mousePower * 0.15;
+      float mousePower = 0.0;
+
+      // OPTIMALIZACE PRO MOBIL: Úplně vynecháme výpočty myši, pokud jsme na mobilu
+      #if IS_MOBILE == 0
+        vec2 m = uMouse;
+        m.x *= uResolution.x / uResolution.y;
+        vec2 delta = p - m;
+        float distMouse = length(delta);
+        mousePower = exp(-distMouse * 6.0); 
+        p = m + rot(mousePower * 1.5) * delta; 
+        p -= normalize(delta + vec2(0.0001)) * mousePower * 0.15;
+      #endif
 
       float distClick = length(p - cp);
       float ring = smoothstep(uClickRipple * 3.0 - 0.2, uClickRipple * 3.0, distClick) - 
