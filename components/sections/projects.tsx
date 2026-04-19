@@ -41,37 +41,71 @@ export const Projects = () => {
   useEffect(() => {
     const ctx = gsap.context(() => {
       const track = trackRef.current;
-      if (!track) return;
+      const section = sectionRef.current;
+      if (!track || !section) return;
       
-      // OPTIMALIZACE FORCED REFLOW: Vypočítáme jen při resize, ne při každém ticku
-      let scrollAmount = 0;
-      const calculateScroll = () => {
-        scrollAmount = track.scrollWidth - window.innerWidth;
-      };
-      calculateScroll();
-      window.addEventListener("resize", calculateScroll);
+      // 1. CLS FIX: Extrémně důležité. Zamkne výšku v PX při startu, aby ignoroval schovávání adresního řádku.
+      section.style.height = `${window.innerHeight}px`;
+
+      let scrollAmount = track.scrollWidth - window.innerWidth;
       
-      gsap.to(track, {
+      const scrollTween = gsap.to(track, {
         x: () => -scrollAmount,
         ease: "none",
         scrollTrigger: {
-          trigger: sectionRef.current,
+          trigger: section,
           start: "top top",
           end: () => `+=${scrollAmount}`,
           scrub: 1,
           pin: true,
-          anticipatePin: 1,
-          invalidateOnRefresh: true 
+          invalidateOnRefresh: true,
+          onUpdate: (self) => {
+            // 2. VELOCITY SKEW: Čím rychleji scrolluješ, tím víc se projekty "ohnou". Fyzika bez ztráty výkonu.
+            // Omezíme (clamp) hodnotu, aby se to na mobilu při rychlém švihu nerozbilo
+            const velocity = Math.min(Math.max(self.getVelocity() / 400, -4), 4);
+            gsap.to(track, { 
+              skewX: velocity, 
+              duration: 0.8, 
+              ease: "power3.out", 
+              overwrite: "auto" 
+            });
+          }
         }
       });
 
-      return () => window.removeEventListener("resize", calculateScroll);
+      // 3. PARALLAX TEXTU: Nadpis každého projektu "plave" jinak rychle než obrázek.
+      gsap.utils.toArray(".parallax-text").forEach((textObj: any) => {
+        gsap.to(textObj, {
+          x: 100, // Nadpis se posune o 100px doprava vzhledem k rodiči
+          ease: "none",
+          scrollTrigger: {
+            trigger: textObj.parentElement, // Trigger je kontejner projektu
+            containerAnimation: scrollTween, // Tohle je klíčové pro horizontální parallax!
+            start: "left right",
+            end: "right left",
+            scrub: true
+          }
+        });
+      });
+
+      // Zajištění updatu výšky pouze při překlopení mobilu (landscape/portrait)
+      const handleResize = () => {
+        if (Math.abs(window.innerHeight - parseInt(section.style.height)) > 150) {
+          section.style.height = `${window.innerHeight}px`;
+          ScrollTrigger.refresh();
+        }
+      };
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+
     }, sectionRef);
+    
     return () => ctx.revert();
   },[]);
 
   return (
-    <section ref={sectionRef} id="work" className="relative w-full h-[100svh] bg-transparent overflow-hidden">
+    // Odstraněno h-[100svh], výška se řídí čistě přes JS inline styl pro fixaci CLS
+    <section ref={sectionRef} id="work" className="relative w-full bg-transparent overflow-hidden">
       <div ref={trackRef} className="flex h-full items-center px-[5vw] md:px-[10vw] gap-[8vw] md:gap-[15vw] will-change-transform py-20">
         
         <div className="flex-shrink-0 w-[90vw] md:w-[55vw] pl-4 md:pl-0 max-w-[100vw]">
@@ -89,10 +123,10 @@ export const Projects = () => {
             key={p.id} 
             href={`/work/${p.slug}`} 
             aria-label={`View case study for ${p.title}`}
-            // OPTIMALIZACE CLS: Odstraněno h-[60svh], přidáno aspect-[3/4] pro stabilní render kontejneru
             className="group relative w-[85vw] md:w-[50vw] aspect-[3/4] md:aspect-[4/3] flex-shrink-0 cursor-pointer block"
           >
-            <div className="absolute -top-8 md:-top-12 left-0 z-20 mix-blend-difference pointer-events-none transition-transform duration-700 group-hover:-translate-y-4">
+            {/* Přidána třída parallax-text pro GSAP */}
+            <div className="parallax-text absolute -top-8 md:-top-12 left-0 z-20 mix-blend-difference pointer-events-none transition-transform duration-700 group-hover:-translate-y-4">
               <h3 className="font-syne font-black text-3xl sm:text-5xl md:text-8xl lg:text-9xl uppercase tracking-tighter text-white opacity-80 group-hover:opacity-100 transition-opacity break-words max-w-[85vw]">
                 {p.title}
               </h3>
@@ -104,13 +138,13 @@ export const Projects = () => {
                 alt={`Screenshot of ${p.title}`}
                 fill
                 sizes="(max-width: 768px) 85vw, 50vw"
-                className="object-cover object-top transition-all duration-[10s] ease-linear group-hover:object-bottom"
+                className="object-cover object-top transition-transform duration-[10s] ease-linear group-hover:scale-105"
                 priority={index === 0} 
               />
               
               <div className="absolute inset-0 bg-black/60 group-hover:bg-black/10 transition-colors duration-700 z-10" />
               <div className="absolute bottom-6 md:bottom-8 left-6 md:left-8 right-6 md:right-8 z-20 flex justify-between items-end transform transition-transform duration-700 group-hover:translate-y-[-5px]">
-              <div className="flex flex-col">
+                <div className="flex flex-col">
                   <span className="font-mono text-[9px] md:text-[10px] tracking-widest uppercase text-white/60 mb-2">{p.id} // {p.role}</span>
                   <span className="font-instrument italic text-lg md:text-xl text-white opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">
                     {p.actionText}
