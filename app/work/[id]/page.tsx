@@ -39,7 +39,7 @@ const DICTIONARY = {
     }
   },
   cs: {
-    return: "Návrat // Index",
+    return: "Návrat",
     roleLabel: "Role",
     liveSite: "Živá Stránka",
     nextProject: "Další Projekt",
@@ -86,8 +86,8 @@ export default function ProjectDetail() {
 
     gsap.fromTo(".detail-title-char", 
       { y: 100, opacity: 0 }, 
-      { y: 0, opacity: 1, duration: 1, stagger: 0.02, ease: "expo.out", delay: 0.4 }
-    );
+      { y: 0, opacity: 1, duration: 0.8, stagger: 0.01, ease: "expo.out", delay: 0.4 }
+);
 
     gsap.fromTo(".ui-element",
       { y: 30, opacity: 0 },
@@ -278,6 +278,8 @@ export default function ProjectDetail() {
                   height={8000} 
                   className="w-full h-auto block object-top" 
                   priority
+                  // TENTO ŘÁDEK: Řekne Next.js, aby na mobilu vygeneroval jen malý obrázek
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1440px"
                 />
               </div>
             </div>

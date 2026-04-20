@@ -9,8 +9,8 @@ import { useLanguage } from "@/components/navigation/language-toggle";
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const DICTIONARY = {
-  en: { dive: "Initiate Dive" },
-  cs: { dive: "Zahájit Sestup" }
+  en: { dive: "Enter System" },
+  cs: { dive: "Vstoupit do systému" }
 };
 
 export const Hero = () => {

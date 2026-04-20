@@ -14,8 +14,12 @@ export const Preloader = () => {
   
   const [shouldRun, setShouldRun] = useState(true); 
   const [isFinished, setIsFinished] = useState(false); 
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    // Rychlá detekce mobilu po mountu
+    setIsMobile(window.innerWidth < 768);
+
     if (sessionStorage.getItem("preloader_played")) {
       setShouldRun(false);
       setIsFinished(true);
@@ -32,11 +36,14 @@ export const Preloader = () => {
     let lastTime = performance.now();
     let frameId: number;
 
+    // LCP FIX: Na mobilu běží loading jen 1 vteřinu, na PC 2.5 vteřiny
+    const duration = isMobile ? 1000 : 2500;
+
     const updateCounter = (time: number) => {
       const delta = Math.min(time - lastTime, 30);
       lastTime = time;
 
-      current += (delta / 2500) * 100;
+      current += (delta / duration) * 100;
       
       if (current >= 100) {
         setCounter(100);
@@ -49,7 +56,7 @@ export const Preloader = () => {
     
     frameId = requestAnimationFrame(updateCounter);
     return () => cancelAnimationFrame(frameId);
-  }, [shouldRun, phase]);
+  }, [shouldRun, phase, isMobile]);
 
   useEffect(() => {
     if (!isFinished && shouldRun) document.body.style.overflow = "hidden";
@@ -107,7 +114,8 @@ export const Preloader = () => {
       return (
         <span 
           key={index} 
-          className={`inline-block overflow-hidden ${isInitial ? 'text-white' : 'fade-letter text-white/90'}`}
+          // FIX OŘEZU PÍSMEN (T, L, R) ZŮSTÁVÁ ZDE
+          className={`inline-block overflow-visible px-[0.1em] -mx-[0.1em] ${isInitial ? 'text-white' : 'fade-letter text-white/90'}`}
         >
           {char}
         </span>
@@ -118,7 +126,6 @@ export const Preloader = () => {
   return (
     <div ref={containerRef} className="fixed inset-0 z-[9999] bg-[#020202] text-white pointer-events-auto overflow-hidden">
       
-      {/* Subtilní texturované pozadí, ať to není jen prázdná čerň */}
       <div className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
 
       <div 
@@ -138,7 +145,6 @@ export const Preloader = () => {
 
       <div ref={secondaryElementsRef} className="absolute inset-0 p-6 md:p-12 flex flex-col justify-end pointer-events-none">
         
-        {/* Progress Container Dole */}
         <div className="flex flex-col w-full max-w-2xl mx-auto gap-4">
           <div className="flex justify-between items-end w-full px-1">
             <div className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest opacity-40">
@@ -151,7 +157,6 @@ export const Preloader = () => {
             </div>
           </div>
           
-          {/* Ostrý, elegantní Progress Bar */}
           <div className="w-full h-[1px] bg-white/10 relative overflow-hidden">
             <div 
               className="absolute top-0 left-0 h-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]" 

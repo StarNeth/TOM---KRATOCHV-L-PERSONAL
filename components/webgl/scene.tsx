@@ -356,7 +356,7 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
         orthographic
         camera={{ position: [0, 0, 1], left: -1, right: 1, top: 1, bottom: -1 }}
         // DPR 1.5 na mobilu je zlatá střední cesta. Absolutně neuvidíš zubatost, ale GPU si oddechne.
-        dpr={isMobile ? Math.min(window.devicePixelRatio, 1.5) : [1, 2]} 
+        dpr={isMobile ? 1 : 1.5}
         gl={{
           powerPreference: "high-performance",
           alpha: false,
