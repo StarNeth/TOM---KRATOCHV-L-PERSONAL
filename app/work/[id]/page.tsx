@@ -129,7 +129,6 @@ export default function ProjectDetail() {
     };
   }, [project?.zone]);
 
-  // UNIVERZÁLNÍ FUNKCE PŘECHODU PRO PC I MOBIL
   const triggerNextProject = useCallback(() => {
     if (isTransitioning.current || !project) return;
     isTransitioning.current = true;
@@ -157,7 +156,7 @@ export default function ProjectDetail() {
   }, [slug, project, router]);
 
   const handleWheel = useCallback((e: WheelEvent) => {
-    if (isFullscreen || window.innerWidth < 1024) return; // Na mobilu nefunguje wheel
+    if (isFullscreen || window.innerWidth < 1024) return; 
     if (e.deltaY > 60) {
       triggerNextProject();
     }
@@ -171,7 +170,11 @@ export default function ProjectDetail() {
   if (!project) return null;
 
   return (
-    <main ref={containerRef} className="relative w-full h-[100svh] overflow-y-auto lg:overflow-hidden bg-transparent text-white selection:bg-white selection:text-black">
+    <main 
+      ref={containerRef} 
+      className="relative w-full h-[100svh] overflow-y-auto lg:overflow-hidden overscroll-none bg-transparent text-white selection:bg-white selection:text-black [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+    >
+      {/* ZDE JE FIX ZÁSEKŮ A SCROLLBARU */}
       
       <div className="transition-curtain fixed inset-0 z-[9999] bg-[#020203] pointer-events-none" />
       <WebGLScene />
@@ -183,7 +186,6 @@ export default function ProjectDetail() {
         </Link>
       </nav>
 
-      {/* Přidán padding bottom (pb-32), aby se dalo na mobilu bezpečně doscrollovat až pod tlačítko */}
       <div className="w-full min-h-full flex flex-col lg:justify-center px-6 md:px-12 lg:px-20 pb-32 lg:pb-0">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 xl:gap-24 w-full max-w-[1920px] mx-auto items-center">
           
@@ -264,7 +266,8 @@ export default function ProjectDetail() {
                 <div className="w-10 lg:w-12" />
               </div>
               
-              <div className="w-full h-full overflow-y-auto custom-scrollbar relative bg-[#020202] z-10" data-lenis-prevent="true" onWheel={(e) => e.stopPropagation()}>
+              {/* ZDE JE FIX MAC OKNA: overscroll-none přidán i sem, aby se ani vnitřní scrollování nezasekávalo */}
+              <div className="w-full h-full overflow-y-auto custom-scrollbar relative bg-[#020202] z-10 overscroll-none" data-lenis-prevent="true" onWheel={(e) => e.stopPropagation()}>
                 <Image 
                   src={project.image} 
                   alt={`${project.title} Interface`} 
@@ -279,7 +282,6 @@ export default function ProjectDetail() {
 
         </div>
 
-        {/* GARANTOVANĚ VIDITELNÉ TLAČÍTKO PRO MOBIL */}
         <div className="lg:hidden w-full flex justify-center mt-16 ui-element z-[200]">
           <button 
             onClick={triggerNextProject} 
@@ -304,11 +306,18 @@ export default function ProjectDetail() {
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        @media (min-width: 1024px) { .custom-scrollbar::-webkit-scrollbar { width: 6px; } }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+        /* FIX: Schování scrollbaru na mobilech v Mac okně */
+        @media (max-width: 1023px) {
+          .custom-scrollbar::-webkit-scrollbar { display: none; }
+          .custom-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        }
+        /* Krásný malý scrollbar pouze pro PC */
+        @media (min-width: 1024px) {
+          .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+          .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+          .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+        }
         
         @keyframes wheel-scroll { 
           0% { transform: translateY(0); opacity: 1; } 
