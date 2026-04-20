@@ -262,7 +262,8 @@ export default function ProjectDetail() {
             )}
           </div>
 
-          <div className="col-span-1 lg:col-span-7 relative h-[60vh] lg:h-[75vh] w-full z-[150] ui-element mt-10 lg:mt-0">
+          {/* FIX: Zde byla odstraněna třída 'ui-element' (na konci původního divu) */}
+          <div className="col-span-1 lg:col-span-7 relative h-[60vh] lg:h-[75vh] w-full z-[150] mt-10 lg:mt-0">
             <div 
               className={`fixed inset-0 z-[998] transition-all duration-700 ${isFullscreen ? 'bg-black/80 backdrop-blur-md pointer-events-auto opacity-100' : 'bg-transparent pointer-events-none opacity-0'}`} 
               onClick={() => setIsFullscreen(false)} 
@@ -303,8 +304,8 @@ export default function ProjectDetail() {
                   height={8000} 
                   className="w-full h-auto block object-top" 
                   priority
-                  // TENTO ŘÁDEK: Řekne Next.js, aby na mobilu vygeneroval jen malý obrázek
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1440px"
+                  unoptimized // FIX: Vercel už nebude obrázek zdržovat renderováním!
                 />
               </div>
             </div>
