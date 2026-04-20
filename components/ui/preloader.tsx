@@ -36,8 +36,7 @@ export const Preloader = () => {
     let lastTime = performance.now();
     let frameId: number;
 
-    // LCP FIX: Na mobilu běží loading jen 1 vteřinu, na PC 2.5 vteřiny
-    const duration = isMobile ? 1000 : 2500;
+    const duration = isMobile ? 150 : 2500;
 
     const updateCounter = (time: number) => {
       const delta = Math.min(time - lastTime, 30);
@@ -73,6 +72,8 @@ export const Preloader = () => {
         window.dispatchEvent(new CustomEvent("preloader-complete"));
       }
     });
+
+    if (isMobile) tl.timeScale(4.0); // 4x zrychlená závěrečná animace na mobilu
 
     tl.to(secondaryElementsRef.current, {
       opacity: 0,

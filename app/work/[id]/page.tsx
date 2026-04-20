@@ -82,16 +82,41 @@ export default function ProjectDetail() {
 
   useGSAP(() => {
     if (!project) return;
-    gsap.to(".transition-curtain", { opacity: 0, duration: 0.8, ease: "power2.inOut", delay: 0.1 });
+    
+    // Detekce mobilu pro GSAP - na mobilu to prostě odpálíme hned
+    const isMob = window.innerWidth < 1024;
 
+    // Opona zmizí bleskově (0.1s místo 0.8s)
+    gsap.to(".transition-curtain", { 
+      opacity: 0, 
+      duration: isMob ? 0.1 : 0.8, 
+      ease: "none", 
+      delay: 0 
+    });
+
+    // NADPIS - Tohle je to LCP! Zrušíme stagger a delay na mobilu.
     gsap.fromTo(".detail-title-char", 
-      { y: 100, opacity: 0 }, 
-      { y: 0, opacity: 1, duration: 0.8, stagger: 0.01, ease: "expo.out", delay: 0.4 }
-);
+      { y: isMob ? 20 : 100, opacity: 0 }, 
+      { 
+        y: 0, 
+        opacity: 1, 
+        duration: isMob ? 0.3 : 1, // Na mobilu 0.3s
+        stagger: isMob ? 0 : 0.02, // Na mobilu vyjedou všechna písmena naráz!
+        ease: "power2.out", 
+        delay: isMob ? 0.1 : 0.4 
+      }
+    );
 
     gsap.fromTo(".ui-element",
       { y: 30, opacity: 0 },
-      { y: 0, opacity: 1, duration: 1.2, stagger: 0.1, ease: "power3.out", delay: 0.6, clearProps: "transform" }
+      { 
+        y: 0, opacity: 1, 
+        duration: isMob ? 0.4 : 1.2, 
+        stagger: isMob ? 0.02 : 0.1, 
+        ease: "power3.out", 
+        delay: isMob ? 0.2 : 0.6, 
+        clearProps: "transform" 
+      }
     );
   }, { scope: containerRef, dependencies: [project?.title] });
 
