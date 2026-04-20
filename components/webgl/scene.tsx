@@ -243,8 +243,10 @@ const LiquidObsidianMaterial = ({ isMobile }: LiquidProps) => {
       float specular = pow(val, 3.0) * mousePower;
       finalCol += vec3(0.3, 0.4, 0.7) * specular * 1.2;
 
-      float grain = random(uv * 300.0 + fract(uTime));
-      finalCol += (grain - 0.5) * 0.06;
+      #if IS_MOBILE == 0
+        float grain = random(uv * 300.0 + fract(uTime));
+        finalCol += (grain - 0.5) * 0.06;
+      #endif
 
       // Původní Opus 4.7 ASCII MATRIX DISSOLVE
       if (uTransition > 0.001) {

@@ -110,7 +110,7 @@ export const Capabilities = () => {
     <section ref={sectionRef} id="capabilities" className="relative w-full min-h-[100svh] z-10 flex flex-col items-center justify-center overflow-hidden py-24 md:py-0">
       
       <div className="cap-title relative md:absolute md:inset-0 flex items-center justify-center pointer-events-none z-10 px-4 mb-12 md:mb-0">
-        <h2 className="font-syne font-black text-[clamp(3.5rem,12vw,10rem)] uppercase tracking-tighter leading-none text-white/50 md:text-white/10 mix-blend-normal">
+      <h2 className="font-syne font-black text-[clamp(2.5rem,10vw,10rem)] uppercase tracking-tighter leading-none text-white/50 md:text-white/10 mix-blend-normal whitespace-nowrap px-4 overflow-visible">
           {t.title}
         </h2>
       </div>

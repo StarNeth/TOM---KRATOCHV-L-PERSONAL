@@ -75,7 +75,7 @@ export const Projects = () => {
 
   return (
     <section ref={containerRef} id="work" className="relative w-full h-[100vh] bg-transparent perspective-[2000px] overflow-hidden">
-      <div ref={trackRef} className="flex h-full items-center px-[5vw] md:px-[10vw] gap-[10vw] md:gap-[15vw] will-change-transform pr-[5vw] md:pr-[20vw] z-10 transform-style-3d">
+      <div ref={trackRef} className="flex h-full items-center px-[5vw] md:px-[10vw] gap-[10vw] md:gap-[15vw] will-change-transform pr-[20vw] z-10 transform-style-3d">
         
         <div className="flex-shrink-0 w-[90vw] md:w-[45vw] relative z-20 pointer-events-none transform-gpu">
           <span className="font-mono text-[10px] tracking-[0.5em] text-white/50 uppercase block mb-6"></span>
