@@ -276,8 +276,8 @@ export const Header = () => {
             TOMÁŠ K.
           </Link>
           <div className="sys-element flex flex-col font-mono text-[9px] tracking-[0.2em] text-white uppercase mt-1 opacity-80">
-            <span>System Architect</span>
-            <span className="opacity-50">Diagnostics // Security</span>
+            <span>Next.js Architect</span>
+            <span className="opacity-50">Creative Engineering / Nuclear Precision</span>
           </div>
         </div>
 

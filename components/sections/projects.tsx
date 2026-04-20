@@ -1,160 +1,142 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
 import Link from "next/link";
 import Image from "next/image";
 import { useLanguage } from "@/components/navigation/language-toggle";
 
-if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+  ScrollTrigger.config({ ignoreMobileResize: true });
+}
 
 const DICTIONARY = {
-  en: {
-    sectionLabel: "02 // Selected Work",
-    titlePart1: "Proven",
-    titlePart2: "Systems.",
-    projects: [
-      { id: "01", title: "ShuXiangLou", role: "Interactive Web", image: "/shu-xien-glou.vercel.app_.webp", brandColor: "#050505", slug: "ShuXiangLou", actionText: "Explore Project" },
-      { id: "02", title: "Kings Barber", role: "Digital Presentation", image: "/kingsbarber-silk.vercel.app_.webp", brandColor: "#0a0a0a", slug: "kings-barber", actionText: "Explore Project" },
-      { id: "03", title: "Project Aion", role: "SaaS R&D", image: "/placeholder.jpg", brandColor: "#111111", slug: "aion", actionText: "View Details" },
-    ]
-  },
-  cs: {
-    sectionLabel: "02 // Vybraná Práce",
-    titlePart1: "Ověřené",
-    titlePart2: "Systémy.",
-    projects: [
-      { id: "01", title: "ShuXiangLou", role: "Interaktivní Web", image: "/shu-xien-glou.vercel.app_.webp", brandColor: "#050505", slug: "ShuXiangLou", actionText: "Prozkoumat Projekt" },
-      { id: "02", title: "Kings Barber", role: "Digitální Prezentace", image: "/kingsbarber-silk.vercel.app_.webp", brandColor: "#0a0a0a", slug: "kings-barber", actionText: "Prozkoumat Projekt" },
-      { id: "03", title: "Project Aion", role: "SaaS Architektura", image: "/placeholder.jpg", brandColor: "#111111", slug: "aion", actionText: "Zobrazit Detaily" },
-    ]
-  }
+  en: { titlePart1: "Digital", titlePart2: "Architectures." },
+  cs: { titlePart1: "Digitální", titlePart2: "Architektury." }
 };
+
+const projects = [
+  { id: "01", title: "ShuXiangLou", image: "/shu-xien-glou.vercel.app_.webp", slug: "shuxianglou" },
+  { id: "02", title: "Kings Barber", image: "/kingsbarber-silk.vercel.app_.webp", slug: "kings-barber" },
+];
 
 export const Projects = () => {
   const { language } = useLanguage();
   const t = DICTIONARY[language];
-  const sectionRef = useRef<HTMLElement>(null);
+  
+  const containerRef = useRef<HTMLElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      const track = trackRef.current;
-      const section = sectionRef.current;
-      if (!track || !section) return;
-      
-      // 1. CLS FIX: Extrémně důležité. Zamkne výšku v PX při startu, aby ignoroval schovávání adresního řádku.
-      section.style.height = `${window.innerHeight}px`;
+  useGSAP(() => {
+    const track = trackRef.current;
+    if (!track) return;
 
-      let scrollAmount = track.scrollWidth - window.innerWidth;
-      
-      const scrollTween = gsap.to(track, {
-        x: () => -scrollAmount,
-        ease: "none",
-        scrollTrigger: {
-          trigger: section,
-          start: "top top",
-          end: () => `+=${scrollAmount}`,
-          scrub: 1,
-          pin: true,
-          invalidateOnRefresh: true,
-          onUpdate: (self) => {
-            // 2. VELOCITY SKEW: Čím rychleji scrolluješ, tím víc se projekty "ohnou". Fyzika bez ztráty výkonu.
-            // Omezíme (clamp) hodnotu, aby se to na mobilu při rychlém švihu nerozbilo
-            const velocity = Math.min(Math.max(self.getVelocity() / 400, -4), 4);
-            gsap.to(track, { 
-              skewX: velocity, 
-              duration: 0.8, 
-              ease: "power3.out", 
-              overwrite: "auto" 
+    let scrollAmount = track.scrollWidth - window.innerWidth;
+    
+    gsap.to(track, {
+      x: () => -scrollAmount,
+      ease: "none",
+      scrollTrigger: {
+        trigger: containerRef.current,
+        start: "top top",
+        end: () => `+=${scrollAmount}`,
+        scrub: 1,
+        pin: true,
+        anticipatePin: 1,
+        invalidateOnRefresh: true,
+        onUpdate: (self) => {
+          if (window.innerWidth > 768) {
+            const velocity = self.getVelocity() / 400; 
+            const clamped = Math.min(Math.max(velocity, -5), 5); 
+            
+            gsap.to(".project-card", {
+              rotationY: -clamped * 1.5,
+              skewX: clamped * 0.5,      
+              z: Math.abs(clamped) * -20, 
+              duration: 0.5,
+              ease: "power2.out",
+              overwrite: "auto"
             });
           }
-        }
-      });
 
-      // 3. PARALLAX TEXTU: Nadpis každého projektu "plave" jinak rychle než obrázek.
-      gsap.utils.toArray(".parallax-text").forEach((textObj: any) => {
-        gsap.to(textObj, {
-          x: 100, // Nadpis se posune o 100px doprava vzhledem k rodiči
-          ease: "none",
-          scrollTrigger: {
-            trigger: textObj.parentElement, // Trigger je kontejner projektu
-            containerAnimation: scrollTween, // Tohle je klíčové pro horizontální parallax!
-            start: "left right",
-            end: "right left",
-            scrub: true
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("webgl-speed-boost", { 
+              detail: { speed: Math.abs(self.getVelocity()) / 1000 } 
+            }));
           }
-        });
-      });
-
-      // Zajištění updatu výšky pouze při překlopení mobilu (landscape/portrait)
-      const handleResize = () => {
-        if (Math.abs(window.innerHeight - parseInt(section.style.height)) > 150) {
-          section.style.height = `${window.innerHeight}px`;
-          ScrollTrigger.refresh();
         }
-      };
-      window.addEventListener("resize", handleResize);
-      return () => window.removeEventListener("resize", handleResize);
+      }
+    });
 
-    }, sectionRef);
-    
-    return () => ctx.revert();
-  },[]);
+  }, { scope: containerRef });
 
   return (
-    // Odstraněno h-[100svh], výška se řídí čistě přes JS inline styl pro fixaci CLS
-    <section ref={sectionRef} id="work" className="relative w-full bg-transparent overflow-hidden">
-      <div ref={trackRef} className="flex h-full items-center px-[5vw] md:px-[10vw] gap-[8vw] md:gap-[15vw] will-change-transform py-20">
+    <section ref={containerRef} id="work" className="relative w-full h-[100vh] bg-transparent perspective-[2000px] overflow-hidden">
+      <div ref={trackRef} className="flex h-full items-center px-[5vw] md:px-[10vw] gap-[10vw] md:gap-[15vw] will-change-transform pr-[20vw] z-10 transform-style-3d">
         
-        <div className="flex-shrink-0 w-[90vw] md:w-[55vw] pl-4 md:pl-0 max-w-[100vw]">
-          <span className="font-mono text-[10px] tracking-[0.5em] text-white/40 uppercase block mb-6">{t.sectionLabel}</span>
-          <h2 className="font-syne font-black text-[clamp(2.5rem,10vw,5rem)] md:text-[clamp(5rem,10vw,10rem)] uppercase tracking-tighter leading-[0.9] text-white whitespace-pre-wrap">
+        <div className="flex-shrink-0 w-[90vw] md:w-[45vw] relative z-20 pointer-events-none transform-gpu">
+          <span className="font-mono text-[10px] tracking-[0.5em] text-white/50 uppercase block mb-6"></span>
+          <h2 className="font-syne font-black text-[clamp(4rem,10vw,10rem)] uppercase tracking-tighter leading-[0.85] text-white whitespace-pre-wrap drop-shadow-2xl">
             {t.titlePart1} <br /> 
-            <span className="font-instrument italic font-light lowercase">
+            <span className="font-instrument italic font-light lowercase text-white/70">
               {t.titlePart2}
             </span>
           </h2>
         </div>
 
-        {t.projects.map((p, index) => (
-          <Link 
-            key={p.id} 
-            href={`/work/${p.slug}`} 
-            aria-label={`View case study for ${p.title}`}
-            className="group relative w-[85vw] md:w-[50vw] aspect-[3/4] md:aspect-[4/3] flex-shrink-0 cursor-pointer block"
-          >
-            {/* Přidána třída parallax-text pro GSAP */}
-            <div className="parallax-text absolute -top-8 md:-top-12 left-0 z-20 mix-blend-difference pointer-events-none transition-transform duration-700 group-hover:-translate-y-4">
-              <h3 className="font-syne font-black text-3xl sm:text-5xl md:text-8xl lg:text-9xl uppercase tracking-tighter text-white opacity-80 group-hover:opacity-100 transition-opacity break-words max-w-[85vw]">
-                {p.title}
-              </h3>
-            </div>
+        {projects.map((p, index) => (
+          <div key={p.id} className="relative w-[85vw] md:w-[55vw] aspect-[3/4] md:aspect-[16/10] flex-shrink-0 group project-card transform-gpu will-change-transform z-50">
             
-            <div className="relative w-full h-full overflow-hidden rounded-[2rem] border border-white/10" style={{ backgroundColor: p.brandColor }}>
+            <div className="absolute -top-12 -left-6 z-0 pointer-events-none opacity-20 hidden md:block transform-gpu -translate-z-20">
+              <span className="font-mono text-[10px] tracking-[0.5em] text-white uppercase"></span>
+            </div>
+
+            <Link 
+              href={`/work/${p.slug}`} 
+              draggable={false}
+              aria-label={`View case study for ${p.title}`}
+              className="relative block w-full h-full rounded-xl md:rounded-[2rem] overflow-hidden border border-white/10 bg-[#050505] shadow-[0_30px_60px_rgba(0,0,0,0.8)] pointer-events-auto cursor-pointer"
+            >
               <Image 
                 src={p.image}
                 alt={`Screenshot of ${p.title}`}
                 fill
-                sizes="(max-width: 768px) 85vw, 50vw"
-                className="object-cover object-top transition-transform duration-[10s] ease-linear group-hover:scale-105"
+                draggable={false}
+                sizes="(max-width: 768px) 85vw, 60vw"
+                className="object-cover object-top opacity-70 group-hover:opacity-100 transition-all duration-700 ease-out group-hover:scale-105 select-none"
                 priority={index === 0} 
               />
               
-              <div className="absolute inset-0 bg-black/60 group-hover:bg-black/10 transition-colors duration-700 z-10" />
-              <div className="absolute bottom-6 md:bottom-8 left-6 md:left-8 right-6 md:right-8 z-20 flex justify-between items-end transform transition-transform duration-700 group-hover:translate-y-[-5px]">
-                <div className="flex flex-col">
-                  <span className="font-mono text-[9px] md:text-[10px] tracking-widest uppercase text-white/60 mb-2">{p.id} // {p.role}</span>
-                  <span className="font-instrument italic text-lg md:text-xl text-white opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">
-                    {p.actionText}
-                  </span>
+              <div className="absolute inset-0 bg-gradient-to-t from-[#020202] via-[#020202]/10 to-transparent opacity-90 pointer-events-none" />
+              
+              <div className="absolute bottom-6 left-6 md:bottom-12 md:left-12 z-20 pointer-events-none">
+                <h3 className="font-syne font-black text-4xl md:text-6xl uppercase tracking-tighter leading-none text-white transition-transform duration-500 group-hover:translate-x-2">
+                  {p.title}
+                </h3>
+              </div>
+
+              <div className="absolute bottom-6 right-6 md:bottom-12 md:right-12 z-20 pointer-events-none">
+                <div className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center backdrop-blur-md group-hover:bg-white transition-all duration-500">
+                  <svg 
+                    width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"
+                    className="text-white group-hover:text-black transition-transform duration-500 group-hover:translate-x-1 group-hover:-translate-y-1"
+                  >
+                    <path d="M1 13L13 1M13 1H4.6M13 1V9.4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                 </div>
               </div>
-            </div>
-          </Link>
+            </Link>
+          </div>
         ))}
       </div>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        .transform-style-3d { transform-style: preserve-3d; }
+        .-translate-z-20 { transform: translateZ(-50px); }
+      `}} />
     </section>
   );
 };

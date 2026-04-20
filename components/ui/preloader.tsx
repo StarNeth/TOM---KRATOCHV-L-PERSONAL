@@ -12,23 +12,19 @@ export const Preloader = () => {
   const [counter, setCounter] = useState(0);
   const [phase, setPhase] = useState<"init" | "loading" | "animating">("init");
   
-  // ZMĚNA: Defaultně musí být true/false takové, aby preloader blokoval web a nic neprobliklo
   const [shouldRun, setShouldRun] = useState(true); 
   const [isFinished, setIsFinished] = useState(false); 
 
   useEffect(() => {
-    // 1. Zabráníme probliknutí a ověříme paměť hned na začátku
     if (sessionStorage.getItem("preloader_played")) {
       setShouldRun(false);
       setIsFinished(true);
-      // Musíme to vystřelit s mikro-zpožděním, aby se Hero stihl namountovat
       setTimeout(() => window.dispatchEvent(new CustomEvent("preloader-complete")), 50);
       return;
     }
     setPhase("loading");
   }, []);
 
-  // 2. Plynulé počítadlo procent
   useEffect(() => {
     if (!shouldRun || phase !== "loading") return;
     
@@ -40,7 +36,7 @@ export const Preloader = () => {
       const delta = Math.min(time - lastTime, 30);
       lastTime = time;
 
-      current += (delta / 2500) * 100; // 2.5 vteřiny
+      current += (delta / 2500) * 100;
       
       if (current >= 100) {
         setCounter(100);
@@ -59,7 +55,6 @@ export const Preloader = () => {
     if (!isFinished && shouldRun) document.body.style.overflow = "hidden";
   }, [isFinished, shouldRun]);
 
-  // 3. CHOREOGRAFIE: Písmena vzletí, TK se spojí
   useGSAP(() => {
     if (phase !== "animating") return;
 
@@ -72,23 +67,20 @@ export const Preloader = () => {
       }
     });
 
-    // A. Zmizí procenta a detaily
     tl.to(secondaryElementsRef.current, {
       opacity: 0,
       duration: 0.4,
       ease: "power3.inOut"
     });
 
-    // B. Písmena vyletí nahoru a fade-outnou JEDNOTLIVĚ
     tl.to(".fade-letter", {
       y: -100,
       opacity: 0,
       duration: 0.6,
-      stagger: 0.03, // Každé písmeno vyletí chvíli po tom předchozím
+      stagger: 0.03,
       ease: "power3.in"
     }, "+=0.2");
 
-    // C. Písmena "T" a "K" se přisunou k sobě (zrušíme mezeru těch zmizelých písmen)
     tl.to(".fade-letter", {
       width: 0,
       paddingRight: 0,
@@ -99,7 +91,6 @@ export const Preloader = () => {
     
     tl.to(".name-space", { width: 0, duration: 0.8, ease: "expo.inOut" }, "<");
 
-    // D. Vytažení opony (celého preloaderu) plynule nahoru
     tl.to(containerRef.current, {
       yPercent: -100,
       duration: 1.2,
@@ -125,15 +116,16 @@ export const Preloader = () => {
   };
 
   return (
-    <div ref={containerRef} className="fixed inset-0 z-[9999] bg-[#020202] text-white pointer-events-auto">
+    <div ref={containerRef} className="fixed inset-0 z-[9999] bg-[#020202] text-white pointer-events-auto overflow-hidden">
       
-      {/* Jméno - Zmenšeno a elegantně vycentrováno */}
+      {/* Subtilní texturované pozadí, ať to není jen prázdná čerň */}
+      <div className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
+
       <div 
         ref={nameWrapperRef} 
         className="absolute inset-0 flex items-center justify-center pointer-events-none"
       >
-        {/* ZMĚNĚNO: Z obřích 12vw na decentní text-4xl / md:text-6xl */}
-        <h1 className="font-syne font-bold text-4xl md:text-6xl tracking-tighter uppercase m-0 flex items-center">
+        <h1 className="font-syne font-bold text-4xl md:text-6xl tracking-tighter uppercase m-0 flex items-center drop-shadow-2xl">
           <div className="flex">
             {renderWord("TOMÁŠ")}
           </div>
@@ -144,26 +136,30 @@ export const Preloader = () => {
         </h1>
       </div>
 
-      <div ref={secondaryElementsRef} className="absolute inset-0 p-6 md:p-12 flex flex-col justify-between pointer-events-none">
-        <div className="flex justify-between w-full">
-          <div className="flex items-center gap-2 opacity-30">
-            <span className="font-mono text-[10px] tracking-[0.3em] uppercase">SYS.01</span>
+      <div ref={secondaryElementsRef} className="absolute inset-0 p-6 md:p-12 flex flex-col justify-end pointer-events-none">
+        
+        {/* Progress Container Dole */}
+        <div className="flex flex-col w-full max-w-2xl mx-auto gap-4">
+          <div className="flex justify-between items-end w-full px-1">
+            <div className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest opacity-40">
+              Initializing
+            </div>
+            
+            <div className="font-syne font-bold text-3xl md:text-5xl leading-none flex items-end">
+              {counter.toString().padStart(3, "0")}
+              <span className="font-mono text-sm md:text-base mb-1 ml-1 opacity-50">%</span>
+            </div>
           </div>
-          <div className="flex gap-4 font-jetbrains text-xs uppercase tracking-widest font-bold opacity-50">
-            <span>System Architect</span>
+          
+          {/* Ostrý, elegantní Progress Bar */}
+          <div className="w-full h-[1px] bg-white/10 relative overflow-hidden">
+            <div 
+              className="absolute top-0 left-0 h-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]" 
+              style={{ width: `${counter}%`, transition: "width 0.1s linear" }}
+            />
           </div>
         </div>
 
-        <div className="flex justify-between items-end w-full">
-          <div className="font-jetbrains text-[10px] md:text-xs uppercase tracking-widest opacity-50 pb-2">
-            Loading<br />Digital Experience
-          </div>
-          
-          <div className="font-jetbrains font-bold text-5xl md:text-7xl leading-none flex items-end">
-            {counter.toString().padStart(3, "0")}
-            <span className="font-syne text-xl md:text-2xl mb-1 ml-2 opacity-50">%</span>
-          </div>
-        </div>
       </div>
     </div>
   );

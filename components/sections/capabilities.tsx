@@ -1,162 +1,162 @@
 "use client";
 
-import { useRef, useMemo } from "react";
+import { useRef, useState, useEffect } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
-import { useLanguage } from "@/components/navigation/language-toggle"; // PŘIDÁNO
+import { useLanguage } from "@/components/navigation/language-toggle";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
 const DICTIONARY = {
-  en: {
-    title: "Architecture",
-    subtitle: "[ Tap nodes to disrupt the system ]"
-  },
-  cs: {
-    title: "Architektura",
-    subtitle: "[ Klikni na uzly pro narušení systému ]"
-  }
+  en: { title: "Architecture" },
+  cs: { title: "Architektura" }
 };
 
+// Vyladěné pozice tak, aby pokryly celou obrazovku a nepřekrývaly se s nadpisem uprostřed
 const skillsData = [
-  "AI WEB ARCHITECT", "UI/UX ENGINEERING", "FRONTEND SYSTEMS",
-  "CREATIVE DEVELOPMENT", "WEBGL / 3D EXPERIENCES", "OSINT & SEC-OPS",
-  "PROMPT ENGINEERING", "REACT / NEXT.JS"
-];
-
-// Pevně dané pozice v procentech (x, y), aby se nepřekrývaly a vypadalo to jako architektonický nákres
-const desktopPositions = [
-  { x: 15, y: 20 }, { x: 50, y: 15 }, { x: 85, y: 25 },
-  { x: 20, y: 55 }, { x: 80, y: 50 },
-  { x: 30, y: 85 }, { x: 70, y: 80 }, { x: 50, y: 60 }
-];
-
-// Na mobilu je poskládáme víc pod sebe do "cik-cak" mřížky
-const mobilePositions = [
-  { x: 25, y: 10 }, { x: 75, y: 20 },
-  { x: 25, y: 35 }, { x: 75, y: 45 },
-  { x: 25, y: 60 }, { x: 75, y: 70 },
-  { x: 25, y: 85 }, { x: 75, y: 95 }
+  { text: "SYSTEM ARCHITECTURE", type: "solid", desk: { x: 15, y: 20 }, mob: { x: 50, y: 15 } },
+  { text: "NEXT.JS 16", type: "outline", desk: { x: 50, y: 15 }, mob: { x: 20, y: 30 } },
+  { text: "REACT 19", type: "orange", desk: { x: 80, y: 25 }, mob: { x: 80, y: 40 } },
+  { text: "WEBGL", type: "circle", desk: { x: 20, y: 50 }, mob: { x: 25, y: 60 } },
+  { text: "UI/UX", type: "outline", desk: { x: 85, y: 55 }, mob: { x: 85, y: 70 } },
+  { text: "PERFORMANCE", type: "solid", desk: { x: 15, y: 80 }, mob: { x: 50, y: 85 } },
+  { text: "3D EXPERIENCES", type: "outline", desk: { x: 50, y: 85 }, mob: { x: 20, y: 10 } },
+  { text: "GSAP", type: "orange", desk: { x: 80, y: 85 }, mob: { x: 80, y: 20 } }
 ];
 
 export const Capabilities = () => {
-  const { language } = useLanguage(); // PŘIDÁNO
-  const t = DICTIONARY[language]; // PŘIDÁNO
+  const { language } = useLanguage();
+  const t = DICTIONARY[language];
   const sectionRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<HTMLDivElement[]>([]);
   const magneticRefs = useRef<HTMLDivElement[]>([]);
+  
+  const [isMounted, setIsMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // 1. GENTLE LEVITATION (Dýchání) - Nahrazuje těžkou fyziku!
+  useEffect(() => {
+    setIsMounted(true);
+    setIsMobile(window.innerWidth < 768);
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   useGSAP(() => {
+    if (!isMounted) return;
+
+    // 1. NEUSTÁLÁ ORGANICKÁ LEVITACE
     nodesRef.current.forEach((node, i) => {
       if (!node) return;
-      
-      // Každé tlačítko má trochu jiný rytmus, aby to nevypadalo uměle
       gsap.to(node, {
-        y: `+=${Math.random() * 15 + 10}`,
-        x: `+=${(Math.random() - 0.5) * 10}`,
-        duration: Math.random() * 2 + 3,
+        y: `+=${Math.random() * 40 - 20}`, 
+        x: `+=${Math.random() * 30 - 15}`, 
+        rotation: `+=${Math.random() * 10 - 5}`,
+        duration: Math.random() * 3 + 4,
         ease: "sine.inOut",
         yoyo: true,
         repeat: -1,
-        delay: Math.random() * -5, // Aby nezačínaly všechny stejně
+        delay: i * -0.7,
       });
     });
 
-    // Animace nadpisu při scrollování
     const titleEl = sectionRef.current?.querySelector('.cap-title');
     if (titleEl) {
       gsap.fromTo(titleEl, 
-        { opacity: 0, y: 30 }, 
-        { opacity: 1, y: 0, duration: 1.2, ease: "power3.out", scrollTrigger: { trigger: sectionRef.current, start: "top 65%" } }
+        { opacity: 0, scale: 0.9, filter: "blur(10px)" }, 
+        { opacity: 1, scale: 1, filter: "blur(0px)", duration: 1.5, ease: "power3.out", scrollTrigger: { trigger: sectionRef.current, start: "top 70%" } }
       );
     }
-  }, { scope: containerRef });
+  }, { scope: sectionRef, dependencies: [isMounted] });
 
-  // 2. MAGNETICKÝ EFEKT (Desktop)
+  // 2. MAGNETICKÝ HOVER (Pouze Desktop)
   const handleMouseMove = (e: React.MouseEvent, index: number) => {
-    // Vypneme hover na mobilu, tam nedává smysl
-    if (window.innerWidth < 768) return; 
-
+    if (isMobile) return; 
     const el = nodesRef.current[index];
     const magneticEl = magneticRefs.current[index];
     if (!el || !magneticEl) return;
-
+    
     const rect = el.getBoundingClientRect();
-    const x = (e.clientX - rect.left - rect.width / 2) * 0.3; // Síla magnetu
-    const y = (e.clientY - rect.top - rect.height / 2) * 0.3;
-
-    gsap.to(magneticEl, { x, y, duration: 0.5, ease: "power2.out", overwrite: true });
+    const x = (e.clientX - rect.left - rect.width / 2) * 0.4;
+    const y = (e.clientY - rect.top - rect.height / 2) * 0.4;
+    
+    gsap.to(magneticEl, { x, y, scale: 1.05, duration: 0.5, ease: "power2.out", overwrite: "auto" });
   };
 
   const handleMouseLeave = (index: number) => {
     const magneticEl = magneticRefs.current[index];
-    if (magneticEl) {
-      gsap.to(magneticEl, { x: 0, y: 0, duration: 0.7, ease: "elastic.out(1, 0.3)", overwrite: true });
-    }
+    if (magneticEl) gsap.to(magneticEl, { x: 0, y: 0, scale: 1, duration: 0.9, ease: "elastic.out(1, 0.3)", overwrite: "auto" });
   };
 
-  // 3. VÝSTŘEL (Action)
+  // 3. SHOCKWAVE KLIK
   const handleClick = (e: React.MouseEvent | React.TouchEvent, index: number) => {
     const magneticEl = magneticRefs.current[index];
-    
-    // Rychlý "Pulse" efekt na kliknuté pilulce
+    if (!magneticEl) return;
+
     gsap.fromTo(magneticEl, 
-      { scale: 0.85, borderColor: "rgba(255,255,255,0.8)" }, 
-      { scale: 1, borderColor: "rgba(255,255,255,0.1)", duration: 0.6, ease: "elastic.out(1, 0.4)" }
+      { scale: 0.8 }, 
+      { scale: 1, duration: 0.6, ease: "elastic.out(1, 0.3)", overwrite: "auto" }
     );
 
-    // Vystřelíme event do tvého Liquid shaderu
     const clientX = 'touches' in e ? e.changedTouches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.changedTouches[0].clientY : e.clientY;
     window.dispatchEvent(new CustomEvent("webgl-shoot", { detail: { x: clientX, y: clientY } }));
   };
 
+  // Zabránění Hydration Mismatch (Neskáčou prvky po načtení)
+  if (!isMounted) return <section className="min-h-[100svh] bg-transparent" />;
+
   return (
-    <section ref={sectionRef} id="capabilities" className="relative w-full min-h-[120svh] md:h-[120vh] z-10 text-white flex flex-col items-center justify-center py-24 overflow-hidden">
+    <section ref={sectionRef} id="capabilities" className="relative w-full min-h-[110svh] z-10 flex flex-col items-center justify-center overflow-hidden">
       
-      {/* Nápis - Čistý, ukotvený nahoře */}
-      <div className="cap-title flex flex-col items-center mb-12 pointer-events-none px-4 text-center w-full z-20">
-        <h2 className="font-syne font-bold text-4xl md:text-7xl uppercase tracking-tighter drop-shadow-lg">{t.title}</h2>
-        <p className="font-mono text-[9px] md:text-xs tracking-[0.3em] uppercase text-white/50 mt-4">
-          {t.subtitle}
-        </p>
+      {/* Obrovský čistý nadpis ukotvený ve středu */}
+      <div className="cap-title absolute inset-0 flex items-center justify-center pointer-events-none z-10 px-4">
+        <h2 className="font-syne font-black text-[clamp(3.5rem,12vw,10rem)] uppercase tracking-tighter leading-none text-white/5 md:text-white/10 mix-blend-overlay md:mix-blend-normal">
+          {t.title}
+        </h2>
       </div>
 
-      {/* Skleněný kontejner - Vrací webu strukturu */}
-      {/* Box */}
-      <div 
-        ref={containerRef} 
-        className="relative w-[92vw] md:w-[85vw] max-w-6xl h-auto min-h-[70vh] py-12 bg-black/20 backdrop-blur-xl border border-white/10 rounded-[2rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-wrap justify-center items-center gap-4 md:gap-0"
-      >
+      {/* Kontejner dovedností */}
+      <div ref={containerRef} className="absolute inset-0 w-full h-full z-20 pointer-events-none max-w-[1600px] mx-auto">
         {skillsData.map((skill, i) => {
-          const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-          // Desktop má pevné pozice, mobil používá bezpečný CSS Flexbox
-          const style = isMobile 
-            ? { position: "relative" as const } 
-            : { position: "absolute" as const, left: `${desktopPositions[i].x}%`, top: `${desktopPositions[i].y}%`, transform: "translate(-50%, -50%)" };
+          const pos = isMobile ? skill.mob : skill.desk;
+          
+          let baseClasses = "relative flex items-center justify-center transition-shadow duration-500 will-change-transform shadow-2xl ";
+          let textClasses = "font-syne font-black tracking-widest uppercase pointer-events-none ";
+          
+          if (skill.type === "solid") {
+            baseClasses += "bg-white text-black px-6 py-4 md:px-10 md:py-6 rounded-full hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]";
+            textClasses += "text-[10px] md:text-xs";
+          } else if (skill.type === "outline") {
+            baseClasses += "bg-transparent border border-white/20 text-white px-6 py-4 md:px-10 md:py-6 rounded-full backdrop-blur-md hover:border-white hover:bg-white/5";
+            textClasses += "text-[10px] md:text-xs";
+          } else if (skill.type === "orange") {
+            baseClasses += "bg-[#ff2a00] text-white px-6 py-4 md:px-10 md:py-6 rounded-sm md:rounded-2xl hover:bg-white hover:text-[#ff2a00] hover:shadow-[0_0_30px_rgba(255,42,0,0.5)]";
+            textClasses += "text-[10px] md:text-xs";
+          } else if (skill.type === "circle") {
+            baseClasses += "bg-[#030303]/80 border border-white/10 text-white w-24 h-24 md:w-32 md:h-32 rounded-full backdrop-blur-md hover:border-[#ff2a00]";
+            textClasses += "text-[9px] md:text-[10px] text-center leading-tight";
+          }
 
           return (
             <div
               key={i}
               ref={(el) => { nodesRef.current[i] = el!; }}
-              className="cursor-pointer group"
-              style={style}
+              className="absolute pointer-events-auto"
+              style={{
+                left: `${pos.x}%`,
+                top: `${pos.y}%`,
+                transform: "translate(-50%, -50%)"
+              }}
               onMouseMove={(e) => handleMouseMove(e, i)}
               onMouseLeave={() => handleMouseLeave(i)}
               onMouseDown={(e) => handleClick(e, i)}
               onTouchStart={(e) => handleClick(e, i)}
             >
-              {/* Samotná "Pilulka" */}
-              <div 
-                ref={(el) => { magneticRefs.current[i] = el!; }} 
-                className="relative px-4 py-2.5 md:px-6 md:py-3.5 bg-black/80 backdrop-blur-md rounded-full border border-white/10 transition-colors duration-300 group-hover:bg-white/10 group-hover:border-white/25 flex items-center justify-center will-change-transform"
-              >
-                <span className="font-syne font-bold text-[9px] md:text-[11px] tracking-[0.15em] uppercase text-white whitespace-nowrap">
-                  {skill}
-                </span>
+              <div ref={(el) => { magneticRefs.current[i] = el!; }} className={baseClasses}>
+                <span className={textClasses}>{skill.text}</span>
               </div>
             </div>
           );

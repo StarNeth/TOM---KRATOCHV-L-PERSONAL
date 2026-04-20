@@ -11,13 +11,11 @@ if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const DICTIONARY = {
   en: {
-    sequence: "Initiate Sequence",
-    copied: "[ Copied to clipboard ]",
+    copied: "Copied to clipboard",
     clickHint: "Click to copy"
   },
   cs: {
-    sequence: "Zahájit Sekvenci",
-    copied: "[ Zkopírováno do schránky ]",
+    copied: "Zkopírováno do schránky",
     clickHint: "Kliknutím zkopíruješ"
   }
 };
@@ -85,9 +83,7 @@ export const Contact = () => {
         
         {/* Header */}
         <div className="contact-reveal flex items-center justify-center gap-4 sm:gap-6 mb-8 sm:mb-12 opacity-50">
-          <span className="text-[10px] font-mono tracking-[0.3em] uppercase">04</span>
-          <div className="w-8 sm:w-12 md:w-24 h-[1px] bg-white/30" />
-          <span className="text-[10px] font-mono tracking-[0.3em] uppercase">{t.sequence}</span>
+          <span className="text-[10px] font-mono tracking-[0.3em] uppercase"></span>
         </div>
 
         {/* Email (Main CTA) - Responsive Typography */}
