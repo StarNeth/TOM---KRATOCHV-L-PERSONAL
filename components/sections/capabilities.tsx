@@ -13,21 +13,20 @@ const DICTIONARY = {
   cs: { title: "Architektura" }
 };
 
-// Vyladěné pozice tak, aby pokryly celou obrazovku a nepřekrývaly se s nadpisem uprostřed
 const skillsData = [
-  { text: "SYSTEM ARCHITECTURE", type: "solid", desk: { x: 15, y: 20 }, mob: { x: 50, y: 15 } },
-  { text: "NEXT.JS 16", type: "outline", desk: { x: 50, y: 15 }, mob: { x: 20, y: 30 } },
-  { text: "REACT 19", type: "orange", desk: { x: 80, y: 25 }, mob: { x: 80, y: 40 } },
-  { text: "WEBGL", type: "circle", desk: { x: 20, y: 50 }, mob: { x: 25, y: 60 } },
-  { text: "UI/UX", type: "outline", desk: { x: 85, y: 55 }, mob: { x: 85, y: 70 } },
-  { text: "PERFORMANCE", type: "solid", desk: { x: 15, y: 80 }, mob: { x: 50, y: 85 } },
-  { text: "3D EXPERIENCES", type: "outline", desk: { x: 50, y: 85 }, mob: { x: 20, y: 10 } },
-  { text: "GSAP", type: "orange", desk: { x: 80, y: 85 }, mob: { x: 80, y: 20 } }
+  { text: "SYSTEM ARCHITECTURE", type: "solid", desk: { x: 15, y: 20 } },
+  { text: "NEXT.JS 16", type: "outline", desk: { x: 50, y: 15 } },
+  { text: "REACT 19", type: "orange", desk: { x: 80, y: 25 } },
+  { text: "WEBGL", type: "circle", desk: { x: 20, y: 50 } },
+  { text: "UI/UX", type: "outline", desk: { x: 85, y: 55 } },
+  { text: "PERFORMANCE", type: "solid", desk: { x: 15, y: 80 } },
+  { text: "3D EXPERIENCES", type: "outline", desk: { x: 50, y: 85 } },
+  { text: "GSAP", type: "orange", desk: { x: 80, y: 85 } }
 ];
 
 export const Capabilities = () => {
   const { language } = useLanguage();
-  const t = DICTIONARY[language];
+  const t = DICTIONARY[language as keyof typeof DICTIONARY];
   const sectionRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<HTMLDivElement[]>([]);
@@ -51,9 +50,9 @@ export const Capabilities = () => {
     nodesRef.current.forEach((node, i) => {
       if (!node) return;
       gsap.to(node, {
-        y: `+=${Math.random() * 40 - 20}`, 
-        x: `+=${Math.random() * 30 - 15}`, 
-        rotation: `+=${Math.random() * 10 - 5}`,
+        y: `+=${isMobile ? (Math.random() * 10 - 5) : (Math.random() * 40 - 20)}`, 
+        x: `+=${isMobile ? (Math.random() * 8 - 4) : (Math.random() * 30 - 15)}`, 
+        rotation: `+=${isMobile ? 0 : (Math.random() * 10 - 5)}`,
         duration: Math.random() * 3 + 4,
         ease: "sine.inOut",
         yoyo: true,
@@ -69,9 +68,8 @@ export const Capabilities = () => {
         { opacity: 1, scale: 1, filter: "blur(0px)", duration: 1.5, ease: "power3.out", scrollTrigger: { trigger: sectionRef.current, start: "top 70%" } }
       );
     }
-  }, { scope: sectionRef, dependencies: [isMounted] });
+  }, { scope: sectionRef, dependencies: [isMounted, isMobile] });
 
-  // 2. MAGNETICKÝ HOVER (Pouze Desktop)
   const handleMouseMove = (e: React.MouseEvent, index: number) => {
     if (isMobile) return; 
     const el = nodesRef.current[index];
@@ -90,8 +88,11 @@ export const Capabilities = () => {
     if (magneticEl) gsap.to(magneticEl, { x: 0, y: 0, scale: 1, duration: 0.9, ease: "elastic.out(1, 0.3)", overwrite: "auto" });
   };
 
-  // 3. SHOCKWAVE KLIK
-  const handleClick = (e: React.MouseEvent | React.TouchEvent, index: number) => {
+  // 3. SHOCKWAVE KLIK - OPRAVENO: Použití onPointerDown pro sjednocení událostí
+  const handlePointerDown = (e: React.PointerEvent, index: number) => {
+    // Release capture zajišťuje, že prvek nebude "držet" event, pokud uživatel posune prst pryč
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    
     const magneticEl = magneticRefs.current[index];
     if (!magneticEl) return;
 
@@ -100,43 +101,37 @@ export const Capabilities = () => {
       { scale: 1, duration: 0.6, ease: "elastic.out(1, 0.3)", overwrite: "auto" }
     );
 
-    const clientX = 'touches' in e ? e.changedTouches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.changedTouches[0].clientY : e.clientY;
-    window.dispatchEvent(new CustomEvent("webgl-shoot", { detail: { x: clientX, y: clientY } }));
+    window.dispatchEvent(new CustomEvent("webgl-shoot", { detail: { x: e.clientX, y: e.clientY } }));
   };
 
-  // Zabránění Hydration Mismatch (Neskáčou prvky po načtení)
   if (!isMounted) return <section className="min-h-[100svh] bg-transparent" />;
 
   return (
-    <section ref={sectionRef} id="capabilities" className="relative w-full min-h-[110svh] z-10 flex flex-col items-center justify-center overflow-hidden">
+    <section ref={sectionRef} id="capabilities" className="relative w-full min-h-[100svh] z-10 flex flex-col items-center justify-center overflow-hidden py-24 md:py-0">
       
-      {/* Obrovský čistý nadpis ukotvený ve středu */}
-      <div className="cap-title absolute inset-0 flex items-center justify-center pointer-events-none z-10 px-4">
-        <h2 className="font-syne font-black text-[clamp(3.5rem,12vw,10rem)] uppercase tracking-tighter leading-none text-white/5 md:text-white/10 mix-blend-overlay md:mix-blend-normal">
+      <div className="cap-title relative md:absolute md:inset-0 flex items-center justify-center pointer-events-none z-10 px-4 mb-12 md:mb-0">
+        <h2 className="font-syne font-black text-[clamp(3.5rem,12vw,10rem)] uppercase tracking-tighter leading-none text-white/50 md:text-white/10 mix-blend-normal">
           {t.title}
         </h2>
       </div>
 
-      {/* Kontejner dovedností */}
-      <div ref={containerRef} className="absolute inset-0 w-full h-full z-20 pointer-events-none max-w-[1600px] mx-auto">
+      <div ref={containerRef} className="relative md:absolute md:inset-0 w-full md:h-full z-20 pointer-events-none max-w-[1600px] mx-auto flex flex-wrap content-center justify-center gap-3 px-4 md:px-0 md:block">
+        
         {skillsData.map((skill, i) => {
-          const pos = isMobile ? skill.mob : skill.desk;
-          
-          let baseClasses = "relative flex items-center justify-center transition-shadow duration-500 will-change-transform shadow-2xl ";
-          let textClasses = "font-syne font-black tracking-widest uppercase pointer-events-none ";
+          let baseClasses = "flex items-center justify-center transition-shadow duration-500 will-change-transform shadow-2xl ";
+          let textClasses = "font-syne font-black tracking-widest uppercase pointer-events-none select-none "; // Přidáno select-none
           
           if (skill.type === "solid") {
-            baseClasses += "bg-white text-black px-6 py-4 md:px-10 md:py-6 rounded-full hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]";
+            baseClasses += "bg-white text-black px-5 py-3 md:px-10 md:py-6 rounded-full hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]";
             textClasses += "text-[10px] md:text-xs";
           } else if (skill.type === "outline") {
-            baseClasses += "bg-transparent border border-white/20 text-white px-6 py-4 md:px-10 md:py-6 rounded-full backdrop-blur-md hover:border-white hover:bg-white/5";
+            baseClasses += "bg-transparent border border-white/20 text-white px-5 py-3 md:px-10 md:py-6 rounded-full backdrop-blur-md hover:border-white hover:bg-white/5";
             textClasses += "text-[10px] md:text-xs";
           } else if (skill.type === "orange") {
-            baseClasses += "bg-[#ff2a00] text-white px-6 py-4 md:px-10 md:py-6 rounded-sm md:rounded-2xl hover:bg-white hover:text-[#ff2a00] hover:shadow-[0_0_30px_rgba(255,42,0,0.5)]";
+            baseClasses += "bg-[#ff2a00] text-white px-5 py-3 md:px-10 md:py-6 rounded-2xl hover:bg-white hover:text-[#ff2a00] hover:shadow-[0_0_30px_rgba(255,42,0,0.5)]";
             textClasses += "text-[10px] md:text-xs";
           } else if (skill.type === "circle") {
-            baseClasses += "bg-[#030303]/80 border border-white/10 text-white w-24 h-24 md:w-32 md:h-32 rounded-full backdrop-blur-md hover:border-[#ff2a00]";
+            baseClasses += "bg-[#030303]/80 border border-white/10 text-white w-20 h-20 md:w-32 md:h-32 rounded-full backdrop-blur-md hover:border-[#ff2a00]";
             textClasses += "text-[9px] md:text-[10px] text-center leading-tight";
           }
 
@@ -144,16 +139,15 @@ export const Capabilities = () => {
             <div
               key={i}
               ref={(el) => { nodesRef.current[i] = el!; }}
-              className="absolute pointer-events-auto"
-              style={{
-                left: `${pos.x}%`,
-                top: `${pos.y}%`,
+              className="relative md:absolute pointer-events-auto touch-none" // Přidáno touch-none pro zamezení mobilních gest překážejících kliknutí
+              style={!isMobile ? {
+                left: `${skill.desk.x}%`,
+                top: `${skill.desk.y}%`,
                 transform: "translate(-50%, -50%)"
-              }}
+              } : {}}
               onMouseMove={(e) => handleMouseMove(e, i)}
               onMouseLeave={() => handleMouseLeave(i)}
-              onMouseDown={(e) => handleClick(e, i)}
-              onTouchStart={(e) => handleClick(e, i)}
+              onPointerDown={(e) => handlePointerDown(e, i)} // ZDE JE OPRAVA (onPointerDown)
             >
               <div ref={(el) => { magneticRefs.current[i] = el!; }} className={baseClasses}>
                 <span className={textClasses}>{skill.text}</span>
