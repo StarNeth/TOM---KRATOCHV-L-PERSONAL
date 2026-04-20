@@ -172,9 +172,8 @@ export default function ProjectDetail() {
   return (
     <main 
       ref={containerRef} 
-      className="relative w-full h-[100svh] overflow-y-auto lg:overflow-hidden overscroll-none bg-transparent text-white selection:bg-white selection:text-black [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+      className="relative w-full min-h-[100svh] lg:h-[100svh] lg:overflow-hidden bg-transparent text-white selection:bg-white selection:text-black"
     >
-      {/* ZDE JE FIX ZÁSEKŮ A SCROLLBARU */}
       
       <div className="transition-curtain fixed inset-0 z-[9999] bg-[#020203] pointer-events-none" />
       <WebGLScene />
@@ -266,8 +265,12 @@ export default function ProjectDetail() {
                 <div className="w-10 lg:w-12" />
               </div>
               
-              {/* ZDE JE FIX MAC OKNA: overscroll-none přidán i sem, aby se ani vnitřní scrollování nezasekávalo */}
-              <div className="w-full h-full overflow-y-auto custom-scrollbar relative bg-[#020202] z-10 overscroll-none" data-lenis-prevent="true" onWheel={(e) => e.stopPropagation()}>
+              <div 
+                className="w-full h-full overflow-y-auto custom-scrollbar relative bg-[#020202] z-10 overscroll-none" 
+                data-lenis-prevent="true" 
+                onWheel={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
+              >
                 <Image 
                   src={project.image} 
                   alt={`${project.title} Interface`} 
@@ -306,12 +309,10 @@ export default function ProjectDetail() {
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
-        /* FIX: Schování scrollbaru na mobilech v Mac okně */
         @media (max-width: 1023px) {
           .custom-scrollbar::-webkit-scrollbar { display: none; }
           .custom-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         }
-        /* Krásný malý scrollbar pouze pro PC */
         @media (min-width: 1024px) {
           .custom-scrollbar::-webkit-scrollbar { width: 6px; }
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
