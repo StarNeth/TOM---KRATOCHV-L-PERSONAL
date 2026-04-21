@@ -17,13 +17,17 @@ const LiquidObsidianMaterial = ({ isMobile }: LiquidProps) => {
   const targetMouse = useRef(new THREE.Vector2(0, 0))
   const scrollData = useRef({ velocity: 0, progress: 0 })
 
+  // FIX DESYNCHRONIZACE: Musíme zjistit přesné DPR, které používá Canvas!
+  const dpr = isMobile ? 1 : 1.5
+
   useEffect(() => {
     let lastY = window.scrollY
 
     if (materialRef.current) {
+      // Vynásobení DPR srovná matematický prostor WebGL s fyzickým DOMem
       materialRef.current.uniforms.uResolution.value.set(
-        window.innerWidth,
-        window.innerHeight,
+        window.innerWidth * dpr,
+        window.innerHeight * dpr,
       )
     }
 
@@ -46,8 +50,8 @@ const LiquidObsidianMaterial = ({ isMobile }: LiquidProps) => {
     const handleResize = () => {
       if (materialRef.current) {
         materialRef.current.uniforms.uResolution.value.set(
-          window.innerWidth,
-          window.innerHeight,
+          window.innerWidth * dpr,
+          window.innerHeight * dpr,
         )
       }
     }

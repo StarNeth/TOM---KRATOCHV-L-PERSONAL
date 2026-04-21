@@ -135,6 +135,13 @@
   100% { transform: translateX(100%); }
 }
 
+@media (pointer: coarse) {
+  #custom-cursor {
+    display: none !important;
+    opacity: 0 !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

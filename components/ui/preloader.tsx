@@ -159,9 +159,10 @@ export const Preloader = () => {
           </div>
           
           <div className="w-full h-[1px] bg-white/10 relative overflow-hidden">
+            {/* ZMĚNĚNO: Odstraněna animace width (Reflow Peklo). Přidáno w-full, origin-left a will-change-transform. Animujeme přes GPU scaleX. */}
             <div 
-              className="absolute top-0 left-0 h-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]" 
-              style={{ width: `${counter}%`, transition: "width 0.1s linear" }}
+              className="absolute top-0 left-0 h-full w-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] origin-left will-change-transform" 
+              style={{ transform: `scaleX(${counter / 100})`, transition: "transform 0.1s linear" }}
             />
           </div>
         </div>
