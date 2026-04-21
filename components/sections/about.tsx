@@ -15,7 +15,7 @@ if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger, useGSAP);
 // SLOVNÍK (DICTIONARY) PRO TUTO SEKCI
 const DICTIONARY = {
   en: {
-    sectionLabel: "01 / Architecture",
+    sectionLabel: "About",
     mainTitlePart1: "Engineering",
     mainTitlePart2: "precision.",
     methodologyTitle: "Methodology",
@@ -28,7 +28,7 @@ const DICTIONARY = {
     paragraph2: "I do not just write code. I engineer digital infrastructure. I bring the rigorous mindset of Root Cause Analysis and systematic problem-solving into frontend development, integrating complex WebGL experiences and AI-driven architectures with uncompromising stability."
   },
   cs: {
-    sectionLabel: "01 / Architektura",
+    sectionLabel: "O mně",
     mainTitlePart1: "Inženýrská",
     mainTitlePart2: "přesnost.",
     methodologyTitle: "Metodologie",
