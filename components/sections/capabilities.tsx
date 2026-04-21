@@ -61,13 +61,16 @@ export const Capabilities = () => {
       });
     });
 
-    const titleEl = sectionRef.current?.querySelector('.cap-title');
-    if (titleEl) {
-      gsap.fromTo(titleEl, 
-        { opacity: 0, scale: 0.9, filter: "blur(10px)" }, 
-        { opacity: 1, scale: 1, filter: "blur(0px)", duration: 1.5, ease: "power3.out", scrollTrigger: { trigger: sectionRef.current, start: "top 70%" } }
-      );
-    }
+    // ZMĚNĚNO: Animaci spustíme až o 100ms později, aby prohlížeč v klidu dokončil první render (First Paint)
+    setTimeout(() => {
+      const titleEl = sectionRef.current?.querySelector('.cap-title');
+      if (titleEl) {
+        gsap.fromTo(titleEl, 
+          { opacity: 0, scale: 0.9, filter: "blur(10px)" }, 
+          { opacity: 1, scale: 1, filter: "blur(0px)", duration: 1.5, ease: "power3.out", scrollTrigger: { trigger: sectionRef.current, start: "top 85%" } }
+        );
+      }
+    }, 100);
   }, { scope: sectionRef, dependencies: [isMounted, isMobile] });
 
   const handleMouseMove = (e: React.MouseEvent, index: number) => {
