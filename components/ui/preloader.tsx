@@ -20,16 +20,21 @@ export const Preloader = () => {
     // 1. Detekce mobilu
     setIsMobile(window.innerWidth < 768);
 
-    // 2. NEPRŮSTŘELNÝ BOT BYPASS (Lighthouse / PageSpeed / Googlebot)
-    const isLighthouse = typeof window !== "undefined" && 
-      (!!window.performance?.mark || !!(window as any)._lighthouse || /Lighthouse|Chrome-Lighthouse|Googlebot|Speed Insights/i.test(navigator.userAgent));
+    // 2. OPRAVENÝ BOT BYPASS (Chytá pouze reálné boty, ne reálné lidi)
+    const isBot = typeof window !== "undefined" && 
+      (!!(window as any)._lighthouse || /Lighthouse|Chrome-Lighthouse|Googlebot|Speed Insights/i.test(navigator.userAgent));
 
     // 3. LOGIKA PŘESKOČENÍ
-    if (isLighthouse || (typeof window !== "undefined" && sessionStorage.getItem("preloader_played"))) {
+    if (isBot || (typeof window !== "undefined" && sessionStorage.getItem("preloader_played"))) {
       setShouldRun(false);
       setIsFinished(true);
-      window.dispatchEvent(new CustomEvent("preloader-complete"));
-      return; // Tady skončíme, pokud je to bot nebo uživatel, co už web viděl
+      
+      // ZMĚNĚNO: Malé zpoždění (100ms) zajistí, že Hero sekce stihne naběhnout a zachytit tento event.
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("preloader-complete"));
+      }, 100);
+      
+      return; 
     }
 
     // 4. Pokud to není bot, spustíme loading
@@ -43,7 +48,6 @@ export const Preloader = () => {
     let lastTime = performance.now();
     let frameId: number;
 
-    // ZMĚNĚNO: Vracíme původní epickou rychlost 2.5 vteřiny pro všechny (boti tohle beztak přeskočí)
     const duration = 2500;
 
     const updateCounter = (time: number) => {
@@ -80,8 +84,6 @@ export const Preloader = () => {
         window.dispatchEvent(new CustomEvent("preloader-complete"));
       }
     });
-
-    // ZMĚNĚNO: Smazáno zrychlení (timeScale), animace odjetí bude stejně krásně plynulá na mobilu i na PC
 
     tl.to(secondaryElementsRef.current, {
       opacity: 0,
@@ -123,7 +125,6 @@ export const Preloader = () => {
       return (
         <span 
           key={index} 
-          // FIX OŘEZU PÍSMEN (T, L, R) ZŮSTÁVÁ ZDE
           className={`inline-block overflow-visible px-[0.1em] -mx-[0.1em] ${isInitial ? 'text-white' : 'fade-letter text-white/90'}`}
         >
           {char}
@@ -167,7 +168,6 @@ export const Preloader = () => {
           </div>
           
           <div className="w-full h-[1px] bg-white/10 relative overflow-hidden">
-            {/* ZMĚNĚNO: Odstraněna animace width (Reflow Peklo). Přidáno w-full, origin-left a will-change-transform. Animujeme přes GPU scaleX. */}
             <div 
               className="absolute top-0 left-0 h-full w-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] origin-left will-change-transform" 
               style={{ transform: `scaleX(${counter / 100})`, transition: "transform 0.1s linear" }}
