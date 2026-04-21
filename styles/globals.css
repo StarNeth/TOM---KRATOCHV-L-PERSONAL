@@ -1,6 +1,5 @@
 @import 'tailwindcss';
 
-
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -164,4 +163,14 @@ html.is-bot .hero-ui {
   visibility: visible !important;
   transform: none !important;
   filter: blur(0px) !important;
+}
+
+/* ZMĚNĚNO: Záchranná brzda proti přetečení (Tablet Gap). 
+   Nutí text zmenšit se dřív, než by přetekl šířku obrazovky. */
+@layer utilities {
+  h1 span {
+    display: block;
+    inline-size: min-content;
+    min-width: 100%;
+  }
 }

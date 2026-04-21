@@ -98,12 +98,13 @@ export const Hero = () => {
 
       <h1 
         ref={nameRef}
-        className="relative font-sans font-black tracking-tighter leading-[1] uppercase text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.15)] text-center will-change-transform w-full flex flex-col items-center opacity-0 py-4"
+        className="relative font-sans font-black tracking-tighter uppercase text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.15)] text-center will-change-transform w-full flex flex-col items-center opacity-0 py-4"
       >
-        <span className="block text-[clamp(1.75rem,9vw,6rem)] sm:text-[clamp(3rem,9vw,7rem)] md:text-[clamp(5rem,8.5vw,10rem)] whitespace-nowrap">
+        {/* ZMĚNĚNO: Přidán lg breakpoint pro iPad, sníženo vw pro bezpečný prostor a fixní line-height (leading-[0.9]) */}
+        <span className="block text-[clamp(1.5rem,8vw,4rem)] sm:text-[clamp(2.5rem,7vw,6rem)] md:text-[clamp(4rem,8vw,8rem)] lg:text-[clamp(5rem,8.5vw,10rem)] whitespace-nowrap leading-[0.9]">
           TOMÁŠ
         </span>
-        <span className="block text-[clamp(1.75rem,9vw,6rem)] sm:text-[clamp(3rem,9vw,7rem)] md:text-[clamp(5rem,8.5vw,10rem)] text-white/90 whitespace-nowrap">
+        <span className="block text-[clamp(1.5rem,8vw,4rem)] sm:text-[clamp(2.5rem,7vw,6rem)] md:text-[clamp(4rem,8vw,8rem)] lg:text-[clamp(5rem,8.5vw,10rem)] text-white/90 whitespace-nowrap leading-[0.9]">
           KRATOCHVÍL
         </span>
       </h1>
