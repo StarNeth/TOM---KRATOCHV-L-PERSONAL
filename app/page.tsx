@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Header } from "@/components/navigation/header";
 import { Hero } from "@/components/sections/hero";
+import { DelayedRenderer } from "@/components/providers/delayed-renderer";
 
 // 1. ZMĚNA: Ostatní sekce načítáme líně (Lazy Load). 
 // Tím brutálně zmenšíme počáteční zátěž na procesor při hydrataci.

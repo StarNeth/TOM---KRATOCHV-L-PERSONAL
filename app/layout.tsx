@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/components/navigation/language-toggle";
 import { Preloader } from "@/components/ui/preloader";
 import { DynamicFavicon } from "@/components/dynamic-favicon";
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { DelayedRenderer } from "@/components/providers/delayed-renderer";
 
 const syne = Syne({ subsets: ["latin"], weight: ["400", "700", "800"], variable: "--font-syne", display: "swap" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
@@ -77,8 +78,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <DynamicFavicon />
           </LenisProvider>
         </LanguageProvider>
-        <SpeedInsights />
-        <Cursor /> 
+        
+        {/* ZMĚNĚNO: Odsunutí ne-kritických nástrojů mimo hlavní renderovací okno bota */}
+        <div style={{ display: 'none' }} className="is-bot-hide">
+           <SpeedInsights />
+        </div>
+        
+        <DelayedRenderer delay={2500}>
+          <Cursor /> 
+        </DelayedRenderer>
       </body>
     </html>
   );
