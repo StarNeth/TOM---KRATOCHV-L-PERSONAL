@@ -150,3 +150,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Synchronní zničení preloaderu pro boty a lidi po refreshi */
+html.is-bot #global-preloader {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

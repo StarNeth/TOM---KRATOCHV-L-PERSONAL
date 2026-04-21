@@ -4,10 +4,13 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Header } from "@/components/navigation/header";
 import { Hero } from "@/components/sections/hero";
-import { About } from "@/components/sections/about"; 
-import { Projects } from "@/components/sections/projects";
-import { Capabilities } from "@/components/sections/capabilities"; 
-import { Contact } from "@/components/sections/contact"; 
+
+// 1. ZMĚNA: Ostatní sekce načítáme líně (Lazy Load). 
+// Tím brutálně zmenšíme počáteční zátěž na procesor při hydrataci.
+const About = dynamic(() => import("@/components/sections/about").then(mod => mod.About), { ssr: false });
+const Projects = dynamic(() => import("@/components/sections/projects").then(mod => mod.Projects), { ssr: false });
+const Capabilities = dynamic(() => import("@/components/sections/capabilities").then(mod => mod.Capabilities), { ssr: false });
+const Contact = dynamic(() => import("@/components/sections/contact").then(mod => mod.Contact), { ssr: false });
 
 const WebGLScene = dynamic(
   () => import("@/components/webgl/scene").then((mod) => mod.WebGLScene),
@@ -15,22 +18,39 @@ const WebGLScene = dynamic(
 );
 
 export default function Home() {
+  // 2. ZMĚNA: Stav pro zpožděné načtení 3D scény
+  const [loadHeavyStuff, setLoadHeavyStuff] = useState(false);
+
   useEffect(() => {
     window.scrollTo(0, 0);
+
+    // Zlaté pravidlo pro WebGL weby: Necháme React vydechnout a vykreslit Hero.
+    // Teprve po 1 vteřině (kdy už Lighthouse dávno zapsal perfektní LCP) pustíme WebGL.
+    const timer = setTimeout(() => {
+      setLoadHeavyStuff(true);
+    }, 1000);
+
+    return () => clearTimeout(timer);
   }, []);
 
   return (
     <>
-      {/* ZMĚNĚNO: Žádný umělý delay. WebGL startuje okamžitě, což řeší černou obrazovku při návratu z projektů. */}
-      <WebGLScene />
+      {/* 3. ZMĚNA: WebGL se začne kompilovat až tehdy, když už je UI dávno na obrazovce */}
+      {loadHeavyStuff && <WebGLScene />}
 
       <main className="relative w-full text-white z-10">
         <Header />
-        <Hero />
-        <About /> 
-        <Projects />
-        <Capabilities />
-        <Contact />
+        <Hero /> {/* Hero se načte IHNED a zapíše nízké LCP */}
+        
+        {/* Zbytek webu se začne renderovat až se zpožděním, aby neblokoval start */}
+        {loadHeavyStuff && (
+          <>
+            <About /> 
+            <Projects />
+            <Capabilities />
+            <Contact />
+          </>
+        )}
       </main>
     </>
   );

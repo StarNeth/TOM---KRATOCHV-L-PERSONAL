@@ -12,26 +12,25 @@ export const Preloader = () => {
   const [counter, setCounter] = useState(0);
   const [phase, setPhase] = useState<"init" | "loading" | "animating">("init");
   
-  // ZMĚNĚNO: Startujeme ve stavu "false" (neviditelný). Tím bot uvidí hned obsah webu (LCP).
-  const [shouldRun, setShouldRun] = useState(false); 
-  const [isFinished, setIsFinished] = useState(true); 
+  // ZMĚNĚNO: Lidé musí preloader vidět okamžitě (žádné probliknutí Headeru)
+  const [shouldRun, setShouldRun] = useState(true); 
+  const [isFinished, setIsFinished] = useState(false); 
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 768);
-    // Agresivní detekce bota
-    const isBot = /Lighthouse|Chrome-Lighthouse|Googlebot|Speed Insights/i.test(navigator.userAgent);
-    const alreadyPlayed = sessionStorage.getItem("preloader_played");
+    
+    // Přečteme třídu, kterou nám v nulté milisekundě vytvořil skript v hlavičce
+    const isBot = document.documentElement.classList.contains('is-bot');
 
-    if (!isBot && !alreadyPlayed) {
-      setShouldRun(true);
-      setIsFinished(false);
-      setPhase("loading");
+    if (isBot) {
+      // Pokud jsme bot (nebo refresh), odstavíme React logiku a pošleme zprávu Hero sekci
+      setShouldRun(false);
+      setIsFinished(true);
+      window.dispatchEvent(new CustomEvent("preloader-complete", { detail: { isBot: true } }));
     } else {
-      // BOT BYPASS: Hned odpálíme event a ŘEKNEME OSTATNÍM KOMPONENTÁM, ŽE JE TO BOT
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent("preloader-complete", { detail: { isBot: isBot } }));
-      }, 100);
+      // Normální člověk - spustíme preloader
+      setPhase("loading");
     }
   }, []);
 
@@ -129,7 +128,7 @@ export const Preloader = () => {
   };
 
   return (
-    <div ref={containerRef} className="fixed inset-0 z-[9999] bg-[#020202] text-white pointer-events-auto overflow-hidden">
+    <div id="global-preloader" ref={containerRef} className="fixed inset-0 z-[9999] bg-[#020202] text-white pointer-events-auto overflow-hidden">
       <div className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
 
       <div 

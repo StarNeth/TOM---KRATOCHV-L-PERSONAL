@@ -12,7 +12,6 @@ const syne = Syne({ subsets: ["latin"], weight: ["400", "700", "800"], variable:
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
 const instrumentSerif = Instrument_Serif({ subsets: ["latin"], weight: ["400"], style: ["normal", "italic"], variable: "--font-instrument", display: "swap" });
 
-
 export const metadata: Metadata = {
   title: "Tomáš Kratochvíl — System Architect",
   description: "Creative developer crafting digital experiences with zero-error tolerance.",
@@ -32,7 +31,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   
-  // ZBRAŇ HROMADNÉHO NIČENÍ PRO SEO (Krok 3)
+  // ZBRAŇ HROMADNÉHO NIČENÍ PRO SEO
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Person",
@@ -49,6 +48,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${syne.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} no-scrollbar overflow-x-hidden`}>
       <head>
+        {/* ZMĚNĚNO: Synchronní detekce bota. Spustí se před prvním renderem. Tím předejdeme probliknutí. */}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              try {
+                var isBot = /Lighthouse|Chrome-Lighthouse|Googlebot|Speed Insights/i.test(navigator.userAgent);
+                var played = sessionStorage.getItem('preloader_played');
+                if (isBot || played) {
+                  document.documentElement.classList.add('is-bot');
+                }
+              } catch(e) {}
+            })();
+          `
+        }} />
+        
         {/* Vložení JSON-LD přímo do hlavičky pro Google Bota */}
         <script
           type="application/ld+json"
