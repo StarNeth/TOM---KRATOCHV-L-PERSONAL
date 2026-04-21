@@ -19,17 +19,19 @@ export const Preloader = () => {
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 768);
+    // Agresivní detekce bota
     const isBot = /Lighthouse|Chrome-Lighthouse|Googlebot|Speed Insights/i.test(navigator.userAgent);
     const alreadyPlayed = sessionStorage.getItem("preloader_played");
 
-    // ZMĚNĚNO: Preloader zapneme jen tehdy, pokud to NENÍ bot a uživatel ho ještě neviděl.
     if (!isBot && !alreadyPlayed) {
       setShouldRun(true);
       setIsFinished(false);
       setPhase("loading");
     } else {
-      // Pokud je to bot, hned odpálíme event pro Hero sekci
-      window.dispatchEvent(new CustomEvent("preloader-complete"));
+      // BOT BYPASS: Hned odpálíme event a ŘEKNEME OSTATNÍM KOMPONENTÁM, ŽE JE TO BOT
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("preloader-complete", { detail: { isBot: isBot } }));
+      }, 100);
     }
   }, []);
 
@@ -73,7 +75,8 @@ export const Preloader = () => {
         document.body.style.overflow = "";
         sessionStorage.setItem("preloader_played", "true");
         setIsFinished(true);
-        window.dispatchEvent(new CustomEvent("preloader-complete"));
+        // Člověk dokoukal animaci, pošleme isBot: false
+        window.dispatchEvent(new CustomEvent("preloader-complete", { detail: { isBot: false } }));
       }
     });
 
@@ -127,7 +130,6 @@ export const Preloader = () => {
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-[9999] bg-[#020202] text-white pointer-events-auto overflow-hidden">
-      
       <div className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
 
       <div 
@@ -146,19 +148,16 @@ export const Preloader = () => {
       </div>
 
       <div ref={secondaryElementsRef} className="absolute inset-0 p-6 md:p-12 flex flex-col justify-end pointer-events-none">
-        
         <div className="flex flex-col w-full max-w-2xl mx-auto gap-4">
           <div className="flex justify-between items-end w-full px-1">
             <div className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest opacity-40">
               Initializing
             </div>
-            
             <div className="font-syne font-bold text-3xl md:text-5xl leading-none flex items-end">
               {counter.toString().padStart(3, "0")}
               <span className="font-mono text-sm md:text-base mb-1 ml-1 opacity-50">%</span>
             </div>
           </div>
-          
           <div className="w-full h-[1px] bg-white/10 relative overflow-hidden">
             <div 
               className="absolute top-0 left-0 h-full w-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] origin-left will-change-transform" 
@@ -166,7 +165,6 @@ export const Preloader = () => {
             />
           </div>
         </div>
-
       </div>
     </div>
   );

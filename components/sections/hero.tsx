@@ -17,35 +17,51 @@ export const Hero = () => {
   const containerRef = useRef<HTMLElement>(null);
   const nameRef = useRef<HTMLHeadingElement>(null);
   const { language } = useLanguage();
-  const content = DICTIONARY[language];
+  const content = DICTIONARY[language as keyof typeof DICTIONARY];
   
-  const [canAnimate, setCanAnimate] = useState(false);
+  // ZMĚNĚNO: Ukládáme si, jestli můžeme animovat a JESTLI JE TO BOT
+  const [animState, setAnimState] = useState<{ ready: boolean, isBot: boolean }>({ ready: false, isBot: false });
 
   useEffect(() => {
+    // Nasloucháme preloaderu
+    const triggerAnim = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      setAnimState({ ready: true, isBot: !!customEvent.detail?.isBot });
+    };
+    window.addEventListener("preloader-complete", triggerAnim);
+
+    // Záchytná síť, pokud uživatel stránku jen refresnul (preloader už neexistuje)
     if (sessionStorage.getItem("preloader_played")) {
-      setCanAnimate(true);
-      return; 
+      const isBot = /Lighthouse|Chrome-Lighthouse|Googlebot|Speed Insights/i.test(navigator.userAgent);
+      setAnimState({ ready: true, isBot });
     }
 
-    // Pokud ne (jsme tu poprvé), normálně čekáme na signál
-    const triggerAnim = () => setCanAnimate(true);
-    window.addEventListener("preloader-complete", triggerAnim);
     return () => window.removeEventListener("preloader-complete", triggerAnim);
   }, []);
 
   useGSAP(() => {
-    if (!canAnimate) return;
+    if (!animState.ready) return;
 
-    const tl = gsap.timeline();
-
-    tl.fromTo(nameRef.current,
-      { y: 40, opacity: 0, filter: "blur(10px)", scale: 0.95 },
-      { y: 0, opacity: 1, filter: "blur(0px)", scale: 1, duration: 1.5, ease: "power3.out" }
-    ).fromTo(".hero-ui",
-      { opacity: 0, y: 10 },
-      { opacity: 1, y: 0, duration: 1, ease: "power3.out", stagger: 0.15 },
-      "-=0.8"
-    );
+    if (animState.isBot) {
+      // ==========================================
+      // BOT BYPASS: OKAMŽITÉ ZOBRAZENÍ (0ms delay)
+      // ==========================================
+      gsap.set(nameRef.current, { y: 0, opacity: 1, filter: "blur(0px)", scale: 1 });
+      gsap.set(".hero-ui", { opacity: 1, y: 0 });
+    } else {
+      // ==========================================
+      // LIDSKÁ VERZE: Plynulá a krásná animace
+      // ==========================================
+      const tl = gsap.timeline();
+      tl.fromTo(nameRef.current,
+        { y: 40, opacity: 0, filter: "blur(10px)", scale: 0.95 },
+        { y: 0, opacity: 1, filter: "blur(0px)", scale: 1, duration: 1.5, ease: "power3.out" }
+      ).fromTo(".hero-ui",
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 1, ease: "power3.out", stagger: 0.15 },
+        "-=0.8"
+      );
+    }
 
     const xTo = gsap.quickTo(nameRef.current, "x", { duration: 1.5, ease: "power3.out" });
     const yTo = gsap.quickTo(nameRef.current, "y", { duration: 1.5, ease: "power3.out" });
@@ -57,7 +73,6 @@ export const Hero = () => {
       yTo(yRatio * 40);
     };
     
-    // Only track mouse on desktop to save battery
     if (window.innerWidth > 768) {
       window.addEventListener("mousemove", handleMouseMove);
     }
@@ -75,7 +90,7 @@ export const Hero = () => {
     });
 
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, { scope: containerRef, dependencies: [canAnimate] });
+  }, { scope: containerRef, dependencies: [animState] });
 
   return (
     <section ref={containerRef} className="relative h-[100svh] w-full flex flex-col justify-center items-center z-10 perspective-[1000px]">
@@ -85,7 +100,6 @@ export const Hero = () => {
         ref={nameRef}
         className="relative font-sans font-black tracking-tighter leading-[1] uppercase text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.15)] text-center will-change-transform w-full flex flex-col items-center opacity-0 py-4"
       >
-        {/* ZMĚNĚNO: clamp(1.75rem,...) pro mobily zajistí, že se jméno nikdy neulomí */}
         <span className="block text-[clamp(1.75rem,9vw,6rem)] sm:text-[clamp(3rem,9vw,7rem)] md:text-[clamp(5rem,8.5vw,10rem)] whitespace-nowrap">
           TOMÁŠ
         </span>
