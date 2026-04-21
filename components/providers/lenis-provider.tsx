@@ -32,39 +32,56 @@ export function LenisProvider({ children }: { children: ReactNode }) {
   const [lenis, setLenis] = useState<Lenis | null>(null);
 
   useEffect(() => {
-    // ČISTÁ KONFIGURACE BEZ CHYBNÝCH TYPŮ
-    const lenisInstance = new Lenis({
-      duration: 1.4,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      orientation: "vertical",
-      gestureOrientation: "vertical",
-      smoothWheel: true,
-      touchMultiplier: 2,
-    });
+    // ZMĚNĚNO: Detekce mobilu pro optimalizaci startu
+    const isMobile = window.innerWidth < 768;
+    
+    // Funkce pro inicializaci Lenis
+    const initLenis = () => {
+      const lenisInstance = new Lenis({
+        duration: 1.4,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        orientation: "vertical",
+        gestureOrientation: "vertical",
+        smoothWheel: true,
+        touchMultiplier: 2,
+      });
 
-    lenisRef.current = lenisInstance;
-    setLenis(lenisInstance);
+      lenisRef.current = lenisInstance;
+      setLenis(lenisInstance);
 
-    let smoothedVelocity = 0;
+      let smoothedVelocity = 0;
 
-    lenisInstance.on("scroll", ({ scroll, velocity, direction, progress }: ScrollState) => {
-      smoothedVelocity = smoothedVelocity * 0.85 + velocity * 0.15;
-      scrollStore.scroll = scroll;
-      scrollStore.velocity = smoothedVelocity;
-      scrollStore.direction = direction;
-      scrollStore.progress = progress;
-    });
+      lenisInstance.on("scroll", ({ scroll, velocity, direction, progress }: ScrollState) => {
+        smoothedVelocity = smoothedVelocity * 0.85 + velocity * 0.15;
+        scrollStore.scroll = scroll;
+        scrollStore.velocity = smoothedVelocity;
+        scrollStore.direction = direction;
+        scrollStore.progress = progress;
+      });
 
-    lenisInstance.on("scroll", ScrollTrigger.update);
+      lenisInstance.on("scroll", ScrollTrigger.update);
 
-    gsap.ticker.add((time) => {
-      lenisInstance.raf(time * 1000);
-    });
-    gsap.ticker.lagSmoothing(0);
+      gsap.ticker.add((time) => {
+        lenisInstance.raf(time * 1000);
+      });
+      gsap.ticker.lagSmoothing(0);
+    };
+
+    // ZMĚNĚNO: Na mobilu počkáme, až se stránka "nadechne" a vykreslí LCP, než zapneme smooth scroll.
+    // Tím uvolníme procesor pro kritický první render.
+    let timeoutId: NodeJS.Timeout;
+    if (isMobile) {
+      timeoutId = setTimeout(initLenis, 500); // 500ms zpoždění na mobilu
+    } else {
+      initLenis(); // Na desktopu hned
+    }
 
     return () => {
-      lenisInstance.destroy();
-      lenisRef.current = null;
+      if (timeoutId) clearTimeout(timeoutId);
+      if (lenisRef.current) {
+        lenisRef.current.destroy();
+        lenisRef.current = null;
+      }
     };
   }, []);
 
