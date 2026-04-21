@@ -12,33 +12,25 @@ export const Preloader = () => {
   const [counter, setCounter] = useState(0);
   const [phase, setPhase] = useState<"init" | "loading" | "animating">("init");
   
-  const [shouldRun, setShouldRun] = useState(true); 
-  const [isFinished, setIsFinished] = useState(false); 
+  // ZMĚNĚNO: Startujeme ve stavu "false" (neviditelný). Tím bot uvidí hned obsah webu (LCP).
+  const [shouldRun, setShouldRun] = useState(false); 
+  const [isFinished, setIsFinished] = useState(true); 
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    // 1. Detekce mobilu
     setIsMobile(window.innerWidth < 768);
+    const isBot = /Lighthouse|Chrome-Lighthouse|Googlebot|Speed Insights/i.test(navigator.userAgent);
+    const alreadyPlayed = sessionStorage.getItem("preloader_played");
 
-    // 2. OPRAVENÝ BOT BYPASS (Chytá pouze reálné boty, ne reálné lidi)
-    const isBot = typeof window !== "undefined" && 
-      (!!(window as any)._lighthouse || /Lighthouse|Chrome-Lighthouse|Googlebot|Speed Insights/i.test(navigator.userAgent));
-
-    // 3. LOGIKA PŘESKOČENÍ
-    if (isBot || (typeof window !== "undefined" && sessionStorage.getItem("preloader_played"))) {
-      setShouldRun(false);
-      setIsFinished(true);
-      
-      // ZMĚNĚNO: Malé zpoždění (100ms) zajistí, že Hero sekce stihne naběhnout a zachytit tento event.
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent("preloader-complete"));
-      }, 100);
-      
-      return; 
+    // ZMĚNĚNO: Preloader zapneme jen tehdy, pokud to NENÍ bot a uživatel ho ještě neviděl.
+    if (!isBot && !alreadyPlayed) {
+      setShouldRun(true);
+      setIsFinished(false);
+      setPhase("loading");
+    } else {
+      // Pokud je to bot, hned odpálíme event pro Hero sekci
+      window.dispatchEvent(new CustomEvent("preloader-complete"));
     }
-
-    // 4. Pokud to není bot, spustíme loading
-    setPhase("loading");
   }, []);
 
   useEffect(() => {

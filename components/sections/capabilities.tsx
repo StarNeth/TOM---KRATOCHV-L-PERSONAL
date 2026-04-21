@@ -47,19 +47,24 @@ export const Capabilities = () => {
     if (!isMounted) return;
 
     // 1. NEUSTÁLÁ ORGANICKÁ LEVITACE
-    nodesRef.current.forEach((node, i) => {
-      if (!node) return;
-      gsap.to(node, {
-        y: `+=${isMobile ? (Math.random() * 10 - 5) : (Math.random() * 40 - 20)}`, 
-        x: `+=${isMobile ? (Math.random() * 8 - 4) : (Math.random() * 30 - 15)}`, 
-        rotation: `+=${isMobile ? 0 : (Math.random() * 10 - 5)}`,
-        duration: Math.random() * 3 + 4,
-        ease: "sine.inOut",
-        yoyo: true,
-        repeat: -1,
-        delay: i * -0.7,
+    // ZMĚNĚNO: Odložíme start animací o 200ms. Prohlížeč tak stihne v klidu vykreslit stránku
+    // a nebude muset stopnout všechno kvůli měření pozic (Reflow).
+    const timeout = setTimeout(() => {
+      nodesRef.current.forEach((node, i) => {
+        if (!node) return;
+        gsap.to(node, {
+          y: `+=${isMobile ? (Math.random() * 10 - 5) : (Math.random() * 40 - 20)}`, 
+          x: `+=${isMobile ? (Math.random() * 8 - 4) : (Math.random() * 30 - 15)}`, 
+          duration: Math.random() * 3 + 4,
+          ease: "sine.inOut",
+          yoyo: true,
+          repeat: -1,
+          delay: i * -0.7,
+        });
       });
-    });
+    }, 200);
+
+    return () => clearTimeout(timeout);
 
     // ZMĚNĚNO: Animaci spustíme až o 100ms později, aby prohlížeč v klidu dokončil první render (First Paint)
     setTimeout(() => {
