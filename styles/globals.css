@@ -151,9 +151,17 @@
   }
 }
 
-/* Synchronní zničení preloaderu pro boty a lidi po refreshi */
 html.is-bot #global-preloader {
   display: none !important;
   opacity: 0 !important;
   pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+html.is-bot h1,
+html.is-bot .hero-ui {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+  filter: blur(0px) !important;
 }
