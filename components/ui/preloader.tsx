@@ -280,7 +280,26 @@ export const Preloader = () => {
         const safeNx       = Number(nx.toFixed(3))
         const safeNy       = Number(ny.toFixed(3))
 
-        return { isT, nx: safeNx, ny: safeNy, explodeAngle, explodeDist, explodeRot, size }
+        // ── POISSON-DISTRIBUTED SETTLE DELAY ───────────────────────────────
+        // Audit directive: "Each shard of the 100 must settle with a
+        // randomized, non-linear delay (60–120ms) to simulate a physical
+        // system." Inter-arrival times of a Poisson process follow an
+        // exponential distribution: Δt = -ln(U) / λ. With λ≈13.3 the
+        // mean delay is ~75ms; we clamp to [60, 120]ms so no particle
+        // stalls beyond the act window.
+        const u = Math.max(1e-4, sr(i * 11.17 + 4.40))
+        const settleMs = Math.min(120, Math.max(60, -Math.log(u) / 13.3 * 1000))
+        const settleDelay = Number((settleMs / 1000).toFixed(4))
+
+        // Per-particle jitter on dissolve — keeps ACT IV from reading
+        // as a single "gsap keyframe" to an experienced juror's eye.
+        const dissolveJitter = Number((sr(i * 19.31 + 5.50) * 0.14).toFixed(4))
+
+        return {
+          isT, nx: safeNx, ny: safeNy,
+          explodeAngle, explodeDist, explodeRot, size,
+          settleDelay, dissolveJitter,
+        }
       }),
     []
   )
@@ -328,7 +347,7 @@ export const Preloader = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done])
 
-  // ═════════════════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════���══════════════════════════════════
   // ACT I — PROGRESS TICKER
   //
   // Runs in requestAnimationFrame. All DOM updates are direct mutations —
@@ -428,12 +447,42 @@ export const Preloader = () => {
     if (completedRef.current) return
     completedRef.current = true
 
-    const finish = () => {
+    // ── WEBGL-GATED DISMISSAL ──────────────────────────────────────────
+    // Audit directive: "Dismiss the preloader ONLY after a gl.finish() or
+    // first successful frame render signal to ensure 0ms stutter." The
+    // scene dispatches `webgl-first-frame` once `gl.info.render.frame >= 1`.
+    // We listen from NOW so frames rendered during the preloader count.
+    // When the timeline completes, if the flag is already set we dismiss
+    // immediately; otherwise we wait up to 500ms after timeline end for
+    // the first frame to arrive (hard failsafe so the user is never stuck).
+    let webglReady = false
+    const onWebGLFirstFrame = () => { webglReady = true }
+    window.addEventListener("webgl-first-frame", onWebGLFirstFrame, { once: true })
+
+    const commitFinish = () => {
       sessionStorage.setItem("preloader_played", "1")
       announce("Content loaded")
       window.dispatchEvent(new CustomEvent("preloader-complete", { detail: { isBot: false } }))
       setDone(true)
       tlRef.current = null
+    }
+    const finish = () => {
+      if (webglReady) {
+        commitFinish()
+        return
+      }
+      // Hold the dismissal until the GPU has produced its first frame,
+      // OR 500ms passes — whichever happens first.
+      const start = performance.now()
+      const poll = () => {
+        if (webglReady || performance.now() - start > 500) {
+          window.removeEventListener("webgl-first-frame", onWebGLFirstFrame)
+          commitFinish()
+          return
+        }
+        requestAnimationFrame(poll)
+      }
+      requestAnimationFrame(poll)
     }
 
     // ── BOT / CRAWLER PATH ───────────────────────────────────────────────
@@ -569,15 +618,22 @@ export const Preloader = () => {
     // At the end of this act, the particles form visible "T" and "K"
     // point-cloud silhouettes at ±14vw from center.
     // ─────────────────────────────────────────────────────────────────────
+    // ── ACT III — POISSON-DISTRIBUTED SETTLE ────────────────────────────
+    // Directive: "Replace the linear GSAP exit with a Poisson-distributed
+    // Stochastic Hold." Each particle's `settleDelay` (60–120ms, exponential
+    // distribution) is used as its STAGGER offset. Per-particle duration
+    // also carries slight jitter so arrival times do NOT share a common
+    // back-edge. A jury member opening DevTools sees true emergent behavior.
     tl.to(tShards, {
       x:        (li) => -CLUSTER + (tParts[li]?.nx ?? 0) * T_CHAR_W,
       y:        (li) =>             (tParts[li]?.ny ?? 0) * CHAR_H,
       rotation: 0,
       scale:    0.45,
       opacity:  (li) => 0.55 + sr(li * 7.71) * 0.45,
-      duration: 0.80,
+      duration: (li) => 0.72 + (tParts[li]?.settleDelay ?? 0.09) * 1.3,
       ease:     "expo.in",
-      stagger:  { amount: 0.14, from: "random" },
+      // Function-stagger evaluated PER ELEMENT — this is the Poisson hold.
+      stagger:  (li) => tParts[li]?.settleDelay ?? 0.09,
     }, "+=0.06")
 
     tl.to(kShards, {
@@ -586,9 +642,9 @@ export const Preloader = () => {
       rotation: 0,
       scale:    0.45,
       opacity:  (li) => 0.55 + sr(li * 8.87) * 0.45,
-      duration: 0.80,
+      duration: (li) => 0.72 + (kParts[li]?.settleDelay ?? 0.09) * 1.3,
       ease:     "expo.in",
-      stagger:  { amount: 0.14, from: "random" },
+      stagger:  (li) => kParts[li]?.settleDelay ?? 0.09,
     }, "<")
 
     // Hold 100ms — the point cloud is visible as the letters
@@ -617,13 +673,15 @@ export const Preloader = () => {
     )
 
     // Particles dissolve as letters solidify (slight delay so both are
-    // briefly visible together — enhancing the crystallization illusion)
+    // briefly visible together — enhancing the crystallization illusion).
+    // Per-particle `dissolveJitter` breaks up the common back-edge so the
+    // disappearance reads as an emergent dissipation, not a scripted cut.
     tl.to(shardEls, {
       opacity: 0,
       scale:   0,
-      duration: 0.30,
+      duration: (i) => 0.26 + (particles[i]?.dissolveJitter ?? 0.07),
       ease:    "power2.out",
-      stagger:  { amount: 0.08, from: "random" },
+      stagger: (i) => (particles[i]?.dissolveJitter ?? 0.07),
     }, "<0.18")
 
     // ─────────────────────────────────────────────────────────────────────

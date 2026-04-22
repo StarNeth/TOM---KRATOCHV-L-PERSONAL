@@ -252,6 +252,126 @@ const MobileMenuOverlay = ({
   )
 }
 
+// ── SYSTEM STATUS BAR ─────────────────────────────────────────────────
+// Directive: "Add a persistent system status bar (fixed bottom, 28px,
+// monospace) surfacing live page data: SYS_DEPTH: 0042px / SECTOR: [WORK]
+// / UPTIME: 00:04:22. This carries the HUD grammar to its logical
+// conclusion." All three values are mutated via refs — zero React renders.
+const SECTORS: Array<{ id: string; label: string }> = [
+  { id: "about",        label: "ABOUT" },
+  { id: "work",         label: "WORK" },
+  { id: "capabilities", label: "ARCHITECTURE" },
+  { id: "contact",      label: "CONTACT" },
+]
+
+const pad2 = (n: number) => n.toString().padStart(2, "0")
+const pad4 = (n: number) => n.toString().padStart(4, "0")
+
+const SystemStatusBar = () => {
+  const depthRef  = useRef<HTMLSpanElement>(null)
+  const sectorRef = useRef<HTMLSpanElement>(null)
+  const uptimeRef = useRef<HTMLSpanElement>(null)
+  const fpsRef    = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    const sessionStart = performance.now()
+    let lastSectorLabel = "HERO"
+    let frames = 0
+    let fpsLastT = performance.now()
+    let raf = 0
+
+    // Intersection-based sector tracking — cheaper than scroll math, and
+    // the source of truth is WHICH section occupies the viewport center.
+    const sectorEls = SECTORS
+      .map(({ id }) => document.getElementById(id))
+      .filter((el): el is HTMLElement => !!el)
+
+    const sectorObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const match = SECTORS.find((s) => s.id === entry.target.id)
+            if (match) lastSectorLabel = match.label
+          }
+        }
+      },
+      { threshold: [0.35], rootMargin: "-35% 0px -35% 0px" }
+    )
+    sectorEls.forEach((el) => sectorObserver.observe(el))
+
+    const tick = (now: number) => {
+      frames++
+
+      // SYS_DEPTH — live scroll offset in pixels (padded to 4 digits)
+      if (depthRef.current) {
+        depthRef.current.textContent = pad4(Math.max(0, Math.round(window.scrollY)))
+      }
+
+      // SECTOR — refreshes only when it changes (cheap DOM writes)
+      if (sectorRef.current && sectorRef.current.textContent !== lastSectorLabel) {
+        sectorRef.current.textContent = lastSectorLabel
+      }
+
+      // UPTIME — HH:MM:SS session timer
+      if (uptimeRef.current) {
+        const secs = Math.floor((now - sessionStart) / 1000)
+        const h = Math.floor(secs / 3600)
+        const m = Math.floor((secs % 3600) / 60)
+        const s = secs % 60
+        uptimeRef.current.textContent = `${pad2(h)}:${pad2(m)}:${pad2(s)}`
+      }
+
+      // FPS — 500ms rolling window
+      if (now - fpsLastT > 500 && fpsRef.current) {
+        const fps = Math.round((frames * 1000) / (now - fpsLastT))
+        fpsRef.current.textContent = pad2(Math.min(999, fps))
+        frames = 0
+        fpsLastT = now
+      }
+
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+
+    return () => {
+      cancelAnimationFrame(raf)
+      sectorObserver.disconnect()
+    }
+  }, [])
+
+  return (
+    <div
+      aria-hidden
+      className="fixed bottom-0 left-0 right-0 z-[190] h-7 flex items-center justify-between px-4 md:px-8 font-mono text-[9px] tracking-[0.28em] uppercase text-white/55 bg-black/40 backdrop-blur-md border-t border-white/5 pointer-events-none select-none"
+      style={{ mixBlendMode: "normal" }}
+    >
+      <span className="flex items-center gap-4">
+        <span className="flex items-center gap-1.5">
+          <span className="text-white/30">SYS_DEPTH</span>
+          <span ref={depthRef} className="tabular-nums text-white/90">0000</span>
+          <span className="text-white/25">PX</span>
+        </span>
+        <span className="hidden sm:flex items-center gap-1.5">
+          <span className="text-white/30">SECTOR</span>
+          <span className="text-white/25">[</span>
+          <span ref={sectorRef} className="text-white/90">HERO</span>
+          <span className="text-white/25">]</span>
+        </span>
+      </span>
+      <span className="flex items-center gap-4">
+        <span className="hidden md:flex items-center gap-1.5">
+          <span className="text-white/30">FPS</span>
+          <span ref={fpsRef} className="tabular-nums text-white/90">60</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="text-white/30">UPTIME</span>
+          <span ref={uptimeRef} className="tabular-nums text-white/90">00:00:00</span>
+        </span>
+      </span>
+    </div>
+  )
+}
+
 // ── HAMBURGER ───────────────────────────────────────────────────────────
 const HamburgerButton = ({ isOpen, onClick }: { isOpen: boolean; onClick: () => void }) => {
   const line1Ref = useRef<HTMLDivElement>(null)
@@ -476,6 +596,11 @@ export const Header = () => {
         onClose={() => setIsMobileMenuOpen(false)}
         onNavigate={handleMobileNavigate}
       />
+
+      {/* The System Status Bar extends the HUD grammar across the full
+          scroll journey — every content section now sits above live
+          telemetry, which is the point of the directive. */}
+      <SystemStatusBar />
     </>
   )
 }
