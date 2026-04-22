@@ -1,99 +1,139 @@
-"use client";
+"use client"
 
-import { useEffect, useRef } from "react";
-import gsap from "gsap";
+import { useEffect, useRef, useState } from "react"
 
 export const Cursor = () => {
-  const cursorWrapperRef = useRef<HTMLDivElement>(null);
-  const crosshairRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const ringRef = useRef<HTMLDivElement>(null)
+  const dotRef = useRef<HTMLDivElement>(null) // Změněno z crossRef
 
   useEffect(() => {
-    // VÝKONNOSTNÍ ZÁMEK PRO MOBILY
-    if (typeof window !== "undefined" && window.innerWidth < 768) return;
+    // Render cursor strictly after hydration to prevent Next.js mismatches
+    if (typeof window !== "undefined" && window.innerWidth >= 768 && window.matchMedia("(pointer: fine)").matches) {
+      setMounted(true)
+    }
+  }, [])
 
-    document.body.style.cursor = "none";
+  useEffect(() => {
+    if (!mounted || !rootRef.current || !ringRef.current || !dotRef.current) return
 
-    const xMove = gsap.quickTo(cursorWrapperRef.current, "x", { duration: 0.15, ease: "power3.out" });
-    const yMove = gsap.quickTo(cursorWrapperRef.current, "y", { duration: 0.15, ease: "power3.out" });
+    const root = rootRef.current
+    const ring = ringRef.current
+    const dot = dotRef.current
 
-    const handleMouseMove = (e: MouseEvent) => {
-      xMove(e.clientX);
-      yMove(e.clientY);
-    };
+    // Force hide native cursor globally
+    const style = document.createElement("style")
+    style.textContent = `* { cursor: none !important; }`
+    document.head.appendChild(style)
 
-    const handleMouseDown = () => {
-      gsap.to(crosshairRef.current, { 
-        scale: 0.5, 
-        duration: 0.1, 
-        ease: "power4.out",
-        overwrite: "auto" 
-      });
-    };
+    // Position tracking
+    let targetX = window.innerWidth / 2
+    let targetY = window.innerHeight / 2
+    let mainX = targetX
+    let mainY = targetY
+    let trailX = targetX
+    let trailY = targetY
 
-    const handleMouseUp = () => {
-      gsap.to(crosshairRef.current, { 
-        scale: 1, 
-        duration: 0.3, 
-        ease: "back.out(1.7)", 
-        overwrite: "auto"
-      });
-    };
+    let isHover = false
+    let isDown = false
+    let rafId = 0
 
-    // NOVÉ: Inteligentní detekce klikatelných elementů (Hover efekt)
-    const handleMouseOver = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      // Zjistíme, jestli myš najela na link, tlačítko, nebo element s kurzorem pointer
-      const isClickable = target.closest("a, button, [role='button'], .cursor-pointer");
+    // Hardware-accelerated DOM mutation
+    const render = () => {
+      mainX += (targetX - mainX) * 0.45 
+      mainY += (targetY - mainY) * 0.45
+      trailX += (targetX - trailX) * 0.15 
+      trailY += (targetY - trailY) * 0.15
+
+      root.style.transform = `translate3d(${mainX}px, ${mainY}px, 0)`
       
-      if (isClickable) {
-        // Animace do tvaru 'X' a zvětšení
-        gsap.to(crosshairRef.current, { 
-          rotation: 45, 
-          scale: 1.4, 
-          duration: 0.4, 
-          ease: "back.out(2)", 
-          overwrite: "auto" 
-        });
-      } else {
-        // Návrat do normálního tvaru '+'
-        gsap.to(crosshairRef.current, { 
-          rotation: 0, 
-          scale: 1, 
-          duration: 0.3, 
-          ease: "power3.out", 
-          overwrite: "auto" 
-        });
-      }
-    };
+      const dx = trailX - mainX
+      const dy = trailY - mainY
+      
+      // Calculate states
+      const ringScale = isHover ? 1.8 : isDown ? 0.7 : 1
+      const dotScale = isHover ? 1.5 : isDown ? 0.7 : 1 // Dot se trochu zvětší na odkazu
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mousedown", handleMouseDown);
-    window.addEventListener("mouseup", handleMouseUp);
-    window.addEventListener("mouseover", handleMouseOver); // Přidán hover listener
+      ring.style.transform = `translate3d(calc(-50% + ${dx}px), calc(-50% + ${dy}px), 0) scale(${ringScale})`
+      dot.style.transform = `translate(-50%, -50%) scale(${dotScale})` // Odstraněna rotace
+      
+      ring.style.borderColor = isHover ? "rgba(255,255,255,1)" : "rgba(255,255,255,0.4)"
+
+      rafId = requestAnimationFrame(render)
+    }
+
+    const onPointerMove = (e: PointerEvent) => {
+      targetX = e.clientX
+      targetY = e.clientY
+    }
+
+    const onPointerDown = () => { isDown = true }
+    const onPointerUp = () => { isDown = false }
+
+    const CLICKABLE_SELECTORS = "a, button, [role='button'], input, textarea, select, [data-cursor='hover']"
+    
+    const onPointerOver = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null
+      isHover = !!target?.closest(CLICKABLE_SELECTORS)
+    }
+
+    window.addEventListener("pointermove", onPointerMove, { passive: true })
+    window.addEventListener("pointerdown", onPointerDown, { passive: true })
+    window.addEventListener("pointerup", onPointerUp, { passive: true })
+    window.addEventListener("pointerover", onPointerOver, { passive: true })
+
+    rafId = requestAnimationFrame(render)
 
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mousedown", handleMouseDown);
-      window.removeEventListener("mouseup", handleMouseUp);
-      window.removeEventListener("mouseover", handleMouseOver);
-      document.body.style.cursor = "auto";
-    };
-  }, []);
+      cancelAnimationFrame(rafId)
+      window.removeEventListener("pointermove", onPointerMove)
+      window.removeEventListener("pointerdown", onPointerDown)
+      window.removeEventListener("pointerup", onPointerUp)
+      window.removeEventListener("pointerover", onPointerOver)
+      if (style.parentNode) style.parentNode.removeChild(style)
+    }
+  }, [mounted])
+
+  if (!mounted) return null
 
   return (
-    <div 
-      ref={cursorWrapperRef} 
-      // Zvýšil jsem z-index na 9999, aby kurzor nezalezl pod preloader nebo menu
-      className="hidden md:block fixed top-0 left-0 pointer-events-none z-[9999] mix-blend-difference"
-      style={{ transform: "translate(-50%, -50%)" }}
+    <div
+      ref={rootRef}
+      aria-hidden
+      className="fixed top-0 left-0 pointer-events-none"
+      style={{
+        zIndex: 999999, // Guarantee top layer
+        isolation: "isolate",
+        willChange: "transform"
+      }}
     >
-      {/* Lehce zmenšený základní stav (w-6 místo w-8) působí víc "profi" */}
-      <div ref={crosshairRef} className="relative w-6 h-6">
-        <div className="absolute top-0 left-1/2 w-[2px] h-2 bg-white -translate-x-1/2" />
-        <div className="absolute bottom-0 left-1/2 w-[2px] h-2 bg-white -translate-x-1/2" />
-        <div className="absolute left-0 top-1/2 w-2 h-[2px] bg-white -translate-y-1/2" />
-        <div className="absolute right-0 top-1/2 w-2 h-[2px] bg-white -translate-y-1/2" />
-      </div>
+      {/* Outer Ring */}
+      <div
+        ref={ringRef}
+        className="absolute top-0 left-0 rounded-full"
+        style={{
+          width: "26px",
+          height: "26px",
+          border: "1px solid rgba(255,255,255,0.4)",
+          willChange: "transform",
+          transition: "border-color 0.2s ease-out",
+          boxShadow: "0 0 10px rgba(0,0,0,0.5)"
+        }}
+      />
+      {/* Inner Dot (Nahradilo Crosshair) */}
+      <div
+        ref={dotRef}
+        className="absolute top-0 left-0 bg-white rounded-full"
+        style={{
+          width: "8px", 
+          height: "8px",
+          willChange: "transform",
+          // ZMĚNĚNO: Používáme boxShadow místo filter. 
+          // Browser to teď nevyrastruje jako obrázek, ale udrží to jako vektor. Zůstane 100% ostrý.
+          boxShadow: "0 2px 4px rgba(0,0,0,0.8)"
+        }}
+      />
     </div>
-  );
-};
+  )
+}

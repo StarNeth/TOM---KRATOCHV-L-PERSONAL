@@ -8,6 +8,7 @@ import { Preloader } from "@/components/ui/preloader";
 import { DynamicFavicon } from "@/components/dynamic-favicon";
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { DelayedRenderer } from "@/components/providers/delayed-renderer";
+import { VelocityDriver } from "@/components/providers/velocity-driver"; 
 
 const syne = Syne({ subsets: ["latin"], weight: ["400", "700", "800"], variable: "--font-syne", display: "swap" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
@@ -47,10 +48,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <html lang="en" className={`${syne.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} no-scrollbar overflow-x-hidden`}>
-      <head>
-        {/* ZMĚNĚNO: Synchronní detekce bota. Spustí se před prvním renderem. Tím předejdeme probliknutí. */}
-        <script dangerouslySetInnerHTML={{
+    <html lang="en" className={`${syne.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} no-scrollbar overflow-x-hidden`} suppressHydrationWarning>
+      {/* ZMĚNĚNO: suppressHydrationWarning přidán na head a scripty, aby je Chrome extensions nemohly shodit */}
+      <head suppressHydrationWarning>
+        <script suppressHydrationWarning dangerouslySetInnerHTML={{
           __html: `
             (function() {
               try {
@@ -67,6 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Vložení JSON-LD přímo do hlavičky pro Google Bota */}
         <script
           type="application/ld+json"
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
@@ -74,6 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Preloader />
         <LanguageProvider>
           <LenisProvider>
+            <VelocityDriver />
             {children}
             <DynamicFavicon />
           </LenisProvider>
@@ -85,7 +88,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
         
         <DelayedRenderer delay={2500}>
-          <Cursor /> 
+         <Cursor /> 
         </DelayedRenderer>
       </body>
     </html>

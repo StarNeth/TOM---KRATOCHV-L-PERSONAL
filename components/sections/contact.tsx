@@ -106,7 +106,7 @@ export const Contact = () => {
             - Desktop: clamp(2rem, 5vw, 7rem) with normal break
           */}
           <h2 
-            className="font-syne font-black leading-[1.1] tracking-tight text-white transition-all duration-200 group-hover:text-transparent group-hover:[-webkit-text-stroke:2px_white] text-[clamp(1.25rem,6vw,2.5rem)] sm:text-[clamp(2rem,5vw,4rem)] md:text-[clamp(2.5rem,4.5vw,7rem)] break-all sm:break-normal hyphens-auto sm:hyphens-none"
+            className="font-syne font-black leading-[1.1] tracking-tight text-white transition-all duration-200 group-hover:text-transparent group-hover:[-webkit-text-stroke:2px_white] text-[clamp(1.25rem,6vw,2.5rem)] sm:text-[clamp(2rem,5vw,4rem)] md:text-[clamp(2.5rem,4.5vw,7rem)] break-all sm:break-normal hyphens-auto sm:hyphens-none drop-shadow-[0_0_40px_rgba(0,0,0,0.85)]"
             lang="en"
           >
             root@tomaskratochvil.com

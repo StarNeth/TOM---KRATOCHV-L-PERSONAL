@@ -1,5 +1,26 @@
 @import "tailwindcss";
 
+/* Custom easing tokens exposed to CSS transitions */
+:root {
+  --ease-silk: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-mechanical: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-decay: cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* Replace the hand-rolled text-hero numbers with something that actually hurts */
+.text-hero {
+  font-size: clamp(4rem, 22vw, 28rem);
+  line-height: 0.82;
+  letter-spacing: -0.06em;
+  font-weight: 900;
+  font-feature-settings: "ss01", "ss02", "cv01";
+}
+
+/* Optional: kill the `cursor: none !important` on inputs so textareas work */
+input, textarea, [contenteditable="true"] {
+  cursor: text !important;
+}
+
 html, body {
   overflow-x: hidden; /* Zakáže posouvání do stran (horizontal scroll) */
   width: 100%;

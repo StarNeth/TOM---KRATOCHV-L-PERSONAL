@@ -1,170 +1,309 @@
-"use client";
+// components/sections/capabilities.tsx
+"use client"
 
-import { useRef, useState, useEffect } from "react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { useGSAP } from "@gsap/react";
-import { useLanguage } from "@/components/navigation/language-toggle";
+/**
+ * capabilities.tsx — Organic Singularity
+ *
+ * NEW: When a pill is clicked, the DOM reacts in sync with the WebGL
+ * refractive shockwave. The pill text undergoes a "letter burst":
+ *   1. letterSpacing explodes outward (0.1em → 0.55em)
+ *   2. A subtle blur flash (blur(3px) → 0)
+ *   3. The wrapper gets a micro scale-punch (0.82 → 1.04 → 1.0)
+ *
+ * The timing is calibrated so the DOM burst peaks at the same moment
+ * the WebGL shockwave ring passes through the clicked pill's position
+ * (~120ms after click), creating the illusion that the fluid and UI
+ * are one living surface.
+ */
 
-if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
+import { useRef, useState, useEffect } from "react"
+import gsap from "gsap"
+import { ScrollTrigger } from "gsap/ScrollTrigger"
+import { useGSAP } from "@gsap/react"
+import { useLanguage } from "@/components/navigation/language-toggle"
+import { velocityBus } from "@/lib/velocity-bus"
+import { ease } from "@/lib/easing"
+
+if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger)
 
 const DICTIONARY = {
   en: { title: "Architecture" },
-  cs: { title: "Architektura" }
-};
+  cs: { title: "Architektura" },
+}
 
 const skillsData = [
-  { text: "SYSTEM ARCHITECTURE", type: "solid", desk: { x: 15, y: 20 } },
-  { text: "NEXT.JS 16", type: "outline", desk: { x: 50, y: 15 } },
-  { text: "REACT 19", type: "orange", desk: { x: 80, y: 25 } },
-  { text: "WEBGL", type: "circle", desk: { x: 20, y: 50 } },
-  { text: "UI/UX", type: "outline", desk: { x: 85, y: 55 } },
-  { text: "PERFORMANCE", type: "solid", desk: { x: 15, y: 80 } },
-  { text: "3D EXPERIENCES", type: "outline", desk: { x: 50, y: 85 } },
-  { text: "GSAP", type: "orange", desk: { x: 80, y: 85 } }
-];
+  { text: "SYSTEM ARCHITECTURE", type: "solid",   desk: { x: 15, y: 20 } },
+  { text: "NEXT.JS 16",          type: "outline",  desk: { x: 50, y: 15 } },
+  { text: "REACT 19",            type: "orange",   desk: { x: 80, y: 25 } },
+  { text: "WEBGL",               type: "circle",   desk: { x: 20, y: 50 } },
+  { text: "UI/UX",               type: "outline",  desk: { x: 85, y: 55 } },
+  { text: "PERFORMANCE",         type: "solid",    desk: { x: 15, y: 80 } },
+  { text: "3D EXPERIENCES",      type: "outline",  desk: { x: 50, y: 85 } },
+  { text: "GSAP",                type: "orange",   desk: { x: 80, y: 85 } },
+]
 
 export const Capabilities = () => {
-  const { language } = useLanguage();
-  const t = DICTIONARY[language as keyof typeof DICTIONARY];
-  const sectionRef = useRef<HTMLElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const nodesRef = useRef<HTMLDivElement[]>([]);
-  const magneticRefs = useRef<HTMLDivElement[]>([]);
-  
-  const [isMounted, setIsMounted] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const { language } = useLanguage()
+  const t = DICTIONARY[language as keyof typeof DICTIONARY]
+  const sectionRef    = useRef<HTMLElement>(null)
+  const containerRef  = useRef<HTMLDivElement>(null)
+  const nodesRef      = useRef<HTMLDivElement[]>([])
+  const magneticRefs  = useRef<HTMLDivElement[]>([])
+  const textSpanRefs  = useRef<HTMLSpanElement[]>([])
+
+  const [isMounted, setIsMounted] = useState(false)
+  const [isMobile, setIsMobile]   = useState(false)
 
   useEffect(() => {
-    setIsMounted(true);
-    setIsMobile(window.innerWidth < 768);
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    setIsMounted(true)
+    setIsMobile(window.innerWidth < 768)
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
 
-  useGSAP(() => {
-    if (!isMounted) return;
+  useGSAP(
+    () => {
+      if (!isMounted) return
 
-    // 1. NEUSTÁLÁ ORGANICKÁ LEVITACE
-    // ZMĚNĚNO: Odložíme start animací o 200ms. Prohlížeč tak stihne v klidu vykreslit stránku
-    // a nebude muset stopnout všechno kvůli měření pozic (Reflow).
-    const timeout = setTimeout(() => {
-      nodesRef.current.forEach((node, i) => {
-        if (!node) return;
-        gsap.to(node, {
-          y: `+=${isMobile ? (Math.random() * 10 - 5) : (Math.random() * 40 - 20)}`, 
-          x: `+=${isMobile ? (Math.random() * 8 - 4) : (Math.random() * 30 - 15)}`, 
-          duration: Math.random() * 3 + 4,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-          delay: i * -0.7,
-        });
-      });
-    }, 200);
+      const timeout = setTimeout(() => {
+        nodesRef.current.forEach((node, i) => {
+          if (!node) return
+          gsap.to(node, {
+            y: `+=${isMobile ? Math.random() * 10 - 5 : Math.random() * 40 - 20}`,
+            x: `+=${isMobile ? Math.random() * 8 - 4 : Math.random() * 30 - 15}`,
+            duration: Math.random() * 3 + 4,
+            ease: "sine.inOut",
+            yoyo: true,
+            repeat: -1,
+            delay: i * -0.7,
+          })
+        })
+      }, 200)
 
-    return () => clearTimeout(timeout);
-
-    // ZMĚNĚNO: Animaci spustíme až o 100ms později, aby prohlížeč v klidu dokončil první render (First Paint)
-    setTimeout(() => {
-      const titleEl = sectionRef.current?.querySelector('.cap-title');
+      const titleEl = sectionRef.current?.querySelector(".cap-title")
       if (titleEl) {
-        gsap.fromTo(titleEl, 
-          { opacity: 0, scale: 0.9, filter: "blur(10px)" }, 
-          { opacity: 1, scale: 1, filter: "blur(0px)", duration: 1.5, ease: "power3.out", scrollTrigger: { trigger: sectionRef.current, start: "top 85%" } }
-        );
+        gsap.fromTo(
+          titleEl,
+          { opacity: 0, scale: 0.92, filter: "blur(12px)" },
+          {
+            opacity: 1,
+            scale: 1,
+            filter: "blur(0px)",
+            duration: 1.4,
+            ease: ease.silk,
+            scrollTrigger: { trigger: sectionRef.current, start: "top 85%" },
+          }
+        )
       }
-    }, 100);
-  }, { scope: sectionRef, dependencies: [isMounted, isMobile] });
+
+      return () => clearTimeout(timeout)
+    },
+    { scope: sectionRef, dependencies: [isMounted, isMobile] }
+  )
+
+  // Velocity-driven grid stretch — single rAF, direct style mutation
+  useEffect(() => {
+    if (!isMounted) return
+    let raf = 0
+    const tick = () => {
+      const { normalized, intensity } = velocityBus.get()
+      const stretch = 1 + intensity * 0.08
+      const skew    = normalized * 2
+      for (const node of nodesRef.current) {
+        if (!node) continue
+        node.style.setProperty("--cap-stretch", `${stretch}`)
+        node.style.setProperty("--cap-skew",    `${skew}deg`)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [isMounted])
 
   const handleMouseMove = (e: React.MouseEvent, index: number) => {
-    if (isMobile) return; 
-    const el = nodesRef.current[index];
-    const magneticEl = magneticRefs.current[index];
-    if (!el || !magneticEl) return;
-    
-    const rect = el.getBoundingClientRect();
-    const x = (e.clientX - rect.left - rect.width / 2) * 0.4;
-    const y = (e.clientY - rect.top - rect.height / 2) * 0.4;
-    
-    gsap.to(magneticEl, { x, y, scale: 1.05, duration: 0.5, ease: "power2.out", overwrite: "auto" });
-  };
+    if (isMobile) return
+    const el        = nodesRef.current[index]
+    const magneticEl = magneticRefs.current[index]
+    if (!el || !magneticEl) return
+    const rect = el.getBoundingClientRect()
+    const x    = (e.clientX - rect.left - rect.width  / 2) * 0.4
+    const y    = (e.clientY - rect.top  - rect.height / 2) * 0.4
+    gsap.to(magneticEl, {
+      x, y, scale: 1.05,
+      duration: 0.5,
+      ease: ease.silk,
+      overwrite: "auto",
+    })
+  }
 
   const handleMouseLeave = (index: number) => {
-    const magneticEl = magneticRefs.current[index];
-    if (magneticEl) gsap.to(magneticEl, { x: 0, y: 0, scale: 1, duration: 0.9, ease: "elastic.out(1, 0.3)", overwrite: "auto" });
-  };
+    const magneticEl = magneticRefs.current[index]
+    if (magneticEl)
+      gsap.to(magneticEl, {
+        x: 0, y: 0, scale: 1,
+        duration: 0.7,
+        ease: ease.ballistic,
+        overwrite: "auto",
+      })
+  }
 
-  // 3. SHOCKWAVE KLIK - OPRAVENO: Použití onPointerDown pro sjednocení událostí
+  // ── THE ORGANIC SINGULARITY ─────────────────────────────────────────────
+  // Click handler dispatches the WebGL shockwave AND fires a GSAP burst
+  // on the text element. Both are additive — the WebGL bends the fluid
+  // BEHIND the text while the DOM reacts ON TOP of it. One living surface.
   const handlePointerDown = (e: React.PointerEvent, index: number) => {
-    // Release capture zajišťuje, že prvek nebude "držet" event, pokud uživatel posune prst pryč
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    
-    const magneticEl = magneticRefs.current[index];
-    if (!magneticEl) return;
+    ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
 
-    gsap.fromTo(magneticEl, 
-      { scale: 0.8 }, 
-      { scale: 1, duration: 0.6, ease: "elastic.out(1, 0.3)", overwrite: "auto" }
-    );
+    const magneticEl = magneticRefs.current[index]
+    const textEl     = textSpanRefs.current[index]
 
-    window.dispatchEvent(new CustomEvent("webgl-shoot", { detail: { x: e.clientX, y: e.clientY } }));
-  };
+    // ── WebGL shockwave (unchanged) ────────────────────────────────────
+    window.dispatchEvent(
+      new CustomEvent("webgl-shoot", { detail: { x: e.clientX, y: e.clientY } })
+    )
 
-  if (!isMounted) return <section className="min-h-[100svh] bg-transparent" />;
+    // ── Pill scale punch ───────────────────────────────────────────────
+    if (magneticEl) {
+      gsap.fromTo(
+        magneticEl,
+        { scale: 0.82 },
+        {
+          scale: 1,
+          duration: 0.55,
+          ease: ease.ballistic,
+          overwrite: "auto",
+        }
+      )
+    }
+
+    // ── Text letter-burst — synced to shockwave ring timing ────────────
+    // The WebGL ring expands at uClickRipple * 3.0 world units.
+    // At 120ms the ring has traveled ~15% of its journey and is roughly
+    // passing through the element origin — that's when we peak the burst.
+    if (textEl) {
+      // The "tracking widest" Tailwind class maps to letter-spacing: 0.1em.
+      // We burst to 0.55em then return to 0.1em.
+      gsap.timeline({ overwrite: "auto" })
+        .fromTo(
+          textEl,
+          {
+            letterSpacing: "0.1em",
+            filter: "blur(0px)",
+            opacity: 1,
+          },
+          {
+            // Phase 1 — the blast: letters snap apart
+            letterSpacing: "0.55em",
+            filter: "blur(3px)",
+            opacity: 0.7,
+            duration: 0.12,
+            ease: "power4.out",
+          }
+        )
+        .to(textEl, {
+          // Phase 2 — silk collapse back: letters magnetic-snap together
+          letterSpacing: "0.1em",
+          filter: "blur(0px)",
+          opacity: 1,
+          duration: 0.85,
+          ease: ease.silk,
+        })
+        // Phase 3 — micro overshoot: letters compress slightly past home
+        .to(textEl, {
+          letterSpacing: "0.06em",
+          duration: 0.2,
+          ease: ease.mechanical,
+        })
+        .to(textEl, {
+          // Settle at true home
+          letterSpacing: "0.1em",
+          duration: 0.4,
+          ease: ease.silk,
+        })
+    }
+  }
+
+  if (!isMounted) return <section className="min-h-[100svh] bg-transparent" />
 
   return (
-    <section ref={sectionRef} id="capabilities" className="relative w-full min-h-[100svh] z-10 flex flex-col items-center justify-center overflow-hidden py-24 md:py-0">
-      
+    <section
+      ref={sectionRef}
+      id="capabilities"
+      className="relative w-full min-h-[100svh] z-10 flex flex-col items-center justify-center overflow-hidden py-24 md:py-0"
+    >
       <div className="cap-title relative md:absolute md:inset-0 flex items-center justify-center pointer-events-none z-10 px-4 mb-12 md:mb-0 w-full overflow-hidden md:overflow-visible">
-        {/* ZMĚNĚNO: Upraven clamp z 10vw na 8vw, aby se 12 písmen vešlo do 100vw. Přidáno w-full a text-center pro jistotu zarovnání na mobilu. */}
-        <h2 className="font-syne font-black text-[clamp(2rem,8vw,10rem)] uppercase tracking-tighter leading-none text-white/50 md:text-white/10 mix-blend-normal whitespace-nowrap w-full text-center">
+        <h2 className="font-sans font-black text-[clamp(2.5rem,14vw,16rem)] uppercase tracking-[-0.05em] leading-[0.82] text-white/50 md:text-white/8 mix-blend-normal whitespace-nowrap w-full text-center">
           {t.title}
         </h2>
       </div>
 
-      <div ref={containerRef} className="relative md:absolute md:inset-0 w-full md:h-full z-20 pointer-events-none max-w-[1600px] mx-auto flex flex-wrap content-center justify-center gap-3 px-4 md:px-0 md:block">
-        
+      <div
+        ref={containerRef}
+        className="relative md:absolute md:inset-0 w-full md:h-full z-20 pointer-events-none max-w-[1600px] mx-auto flex flex-wrap content-center justify-center gap-3 px-4 md:px-0 md:block"
+      >
         {skillsData.map((skill, i) => {
-          let baseClasses = "flex items-center justify-center transition-shadow duration-500 will-change-transform shadow-2xl ";
-          let textClasses = "font-syne font-black tracking-widest uppercase pointer-events-none select-none "; // Přidáno select-none
-          
+          let baseClasses =
+            "flex items-center justify-center transition-shadow duration-500 will-change-transform shadow-2xl "
+          let textClasses =
+            "font-sans font-black tracking-widest uppercase pointer-events-none select-none "
+
           if (skill.type === "solid") {
-            baseClasses += "bg-white text-black px-5 py-3 md:px-10 md:py-6 rounded-full hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]";
-            textClasses += "text-[10px] md:text-xs";
+            baseClasses +=
+              "bg-white text-black px-5 py-3 md:px-10 md:py-6 rounded-full hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]"
+            textClasses += "text-[10px] md:text-xs"
           } else if (skill.type === "outline") {
-            baseClasses += "bg-transparent border border-white/20 text-white px-5 py-3 md:px-10 md:py-6 rounded-full backdrop-blur-md hover:border-white hover:bg-white/5";
-            textClasses += "text-[10px] md:text-xs";
+            baseClasses +=
+              "bg-transparent border border-white/20 text-white px-5 py-3 md:px-10 md:py-6 rounded-full backdrop-blur-md hover:border-white hover:bg-white/5"
+            textClasses += "text-[10px] md:text-xs"
           } else if (skill.type === "orange") {
-            baseClasses += "bg-[#ff2a00] text-white px-5 py-3 md:px-10 md:py-6 rounded-2xl hover:bg-white hover:text-[#ff2a00] hover:shadow-[0_0_30px_rgba(255,42,0,0.5)]";
-            textClasses += "text-[10px] md:text-xs";
+            baseClasses +=
+              "bg-[#ff2a00] text-white px-5 py-3 md:px-10 md:py-6 rounded-2xl hover:bg-white hover:text-[#ff2a00] hover:shadow-[0_0_30px_rgba(255,42,0,0.5)]"
+            textClasses += "text-[10px] md:text-xs"
           } else if (skill.type === "circle") {
-            baseClasses += "bg-[#030303]/80 border border-white/10 text-white w-20 h-20 md:w-32 md:h-32 rounded-full backdrop-blur-md hover:border-[#ff2a00]";
-            textClasses += "text-[9px] md:text-[10px] text-center leading-tight";
+            baseClasses +=
+              "bg-[#030303]/80 border border-white/10 text-white w-20 h-20 md:w-32 md:h-32 rounded-full backdrop-blur-md hover:border-[#ff2a00]"
+            textClasses += "text-[9px] md:text-[10px] text-center leading-tight"
           }
 
           return (
             <div
               key={i}
-              ref={(el) => { nodesRef.current[i] = el!; }}
-              className="relative md:absolute pointer-events-auto touch-none" // Přidáno touch-none pro zamezení mobilních gest překážejících kliknutí
-              style={!isMobile ? {
-                left: `${skill.desk.x}%`,
-                top: `${skill.desk.y}%`,
-                transform: "translate(-50%, -50%)"
-              } : {}}
+              ref={(el) => { nodesRef.current[i] = el! }}
+              className="relative md:absolute pointer-events-auto touch-none"
+              style={
+                isMobile ? {} : { left: `${skill.desk.x}%`, top: `${skill.desk.y}%` }
+              }
               onMouseMove={(e) => handleMouseMove(e, i)}
               onMouseLeave={() => handleMouseLeave(i)}
-              onPointerDown={(e) => handlePointerDown(e, i)} // ZDE JE OPRAVA (onPointerDown)
+              onPointerDown={(e) => handlePointerDown(e, i)}
             >
-              <div ref={(el) => { magneticRefs.current[i] = el!; }} className={baseClasses}>
-                <span className={textClasses}>{skill.text}</span>
+              <div
+                ref={(el) => { magneticRefs.current[i] = el! }}
+                className={baseClasses}
+                style={{
+                  ["--cap-stretch" as any]: 1,
+                  ["--cap-skew"    as any]: "0deg",
+                  transform:
+                    "translate(-50%, -50%) scaleY(var(--cap-stretch)) skewX(var(--cap-skew))",
+                  willChange: "transform",
+                  transition:
+                    "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                }}
+              >
+                {/* textSpanRefs — the DOM target for the letter-burst animation */}
+                <span
+                  ref={(el) => { textSpanRefs.current[i] = el! }}
+                  className={textClasses}
+                  style={{ willChange: "letter-spacing, filter, opacity" }}
+                >
+                  {skill.text}
+                </span>
               </div>
             </div>
-          );
+          )
         })}
       </div>
     </section>
-  );
-};
+  )
+}
