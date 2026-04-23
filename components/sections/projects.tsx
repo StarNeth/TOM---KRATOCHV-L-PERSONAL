@@ -25,6 +25,67 @@ const projects = [
   { id: "02", title: "Kings Barber", image: "/kingsbarber-silk.vercel.app_.webp", slug: "kings-barber" },
 ]
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HUD DECRYPTION PROTOCOL
+// Geometric / monospace-friendly pool — glyphs that won't visually collapse
+// against the Syne weight-900 display.
+// ─────────────────────────────────────────────────────────────────────────────
+const SCRAMBLE_POOL = "█▓▒░◆◉◈▲▼►◄#$%&*<>?:01XABCDEF/\\[]{}+-="
+
+const decrypt = (el: HTMLElement, finalText: string, duration = 1.2) => {
+  const total = finalText.length
+  const durMs = duration * 1000
+  const startT = performance.now()
+  let raf = 0
+
+  const step = () => {
+    const t = Math.min(1, (performance.now() - startT) / durMs)
+    // ease-out-cubic — fast initial reveal, settles cleanly at the lock
+    const reveal = 1 - Math.pow(1 - t, 3)
+    const locked = Math.floor(reveal * total)
+
+    let out = ""
+    for (let i = 0; i < total; i++) {
+      const c = finalText[i]
+      if (c === " ") {
+        out += " "
+        continue
+      }
+      if (i < locked) {
+        out += c
+      } else {
+        out += SCRAMBLE_POOL[(Math.random() * SCRAMBLE_POOL.length) | 0]
+      }
+    }
+    el.textContent = out
+
+    if (t < 1) {
+      raf = requestAnimationFrame(step)
+    } else {
+      el.textContent = finalText
+    }
+  }
+  raf = requestAnimationFrame(step)
+  return () => cancelAnimationFrame(raf)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAST-IRON ASYMMETRIC SPRING
+// Stiff on push (energy injection), heavy/slow on recovery (inertia back to 0).
+// Produces that "dragging a magnetised iron plate" resistance curve — the tilt
+// loads up quickly when you flick scroll, then bleeds off with weight.
+// ─────────────────────────────────────────────────────────────────────────────
+const asymLerp = (
+  current: number,
+  target: number,
+  stiffPush = 0.22,
+  slowRecovery = 0.055,
+) => {
+  const accelerating = Math.abs(target) > Math.abs(current)
+  const k = accelerating ? stiffPush : slowRecovery
+  return current + (target - current) * k
+}
+
 export const Projects = () => {
   const { language } = useLanguage()
   const t = DICTIONARY[language]
@@ -32,13 +93,17 @@ export const Projects = () => {
   const containerRef = useRef<HTMLElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const bgWordRef = useRef<HTMLDivElement>(null)
-  // Cached DOM references so the rAF loop never calls querySelectorAll.
-  // The old version queried the DOM EVERY frame — a forced-reflow disaster.
+
+  // Cached DOM refs — the rAF loop NEVER calls querySelector.
   const cardRefs = useRef<HTMLElement[]>([])
+  const titleRefs = useRef<HTMLElement[]>([])
+  const imgWrapRefs = useRef<HTMLDivElement[]>([])
+  const chromaRRefs = useRef<HTMLDivElement[]>([])
+  const chromaCRefs = useRef<HTMLDivElement[]>([])
 
   const [isVisible, setIsVisible] = useState(false)
 
-  // Horizontal scroll pin — NO local velocity math. The bus owns physics.
+  // Horizontal scroll pin — no local velocity math. The bus owns physics.
   useGSAP(
     () => {
       const track = trackRef.current
@@ -60,32 +125,52 @@ export const Projects = () => {
         },
       })
     },
-    { scope: containerRef }
+    { scope: containerRef },
   )
 
-  // Visibility gate — the rAF tilt loop only runs while the section is in
-  // (or near) the viewport. Saves ~4% main-thread time when scrolled past.
+  // Visibility gate — rAF tilt loop only runs while in/near viewport.
   useEffect(() => {
     if (!containerRef.current) return
-    const io = new IntersectionObserver(
-      ([entry]) => setIsVisible(entry.isIntersecting),
-      { rootMargin: "300px" }
-    )
+    const io = new IntersectionObserver(([entry]) => setIsVisible(entry.isIntersecting), {
+      rootMargin: "300px",
+    })
     io.observe(containerRef.current)
     return () => io.disconnect()
   }, [])
 
-  // SINGLE rAF loop — operates on CACHED refs (no DOM queries per frame).
+  // ───────────────────────────────────────────────────────────────────────────
+  // SINGLE rAF LOOP — CACHED REFS + ASYMMETRIC SPRING
+  // Direct style.setProperty on CSS variables. No React state in the hot path.
+  // ───────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isVisible) return
     let raf = 0
     const cards = cardRefs.current
     const bg = bgWordRef.current
 
+    // Persistent spring state — lives across frames, reset on teardown.
+    let sRotY = 0
+    let sSkewX = 0
+    let sBgSkew = 0
+    let sBgStretch = 1
+
     const tick = () => {
       const { normalized, intensity } = velocityBus.get()
-      const vRotY = -normalized * 5
-      const vSkewX = normalized * 2
+
+      // Velocity-driven targets
+      const tRotY = -normalized * 5
+      const tSkewX = normalized * 2
+      const tBgSkew = normalized * -6
+      const tBgStretch = 1 + intensity * 0.1
+
+      // Asymmetric integration — the whole reason this feels heavy
+      sRotY = asymLerp(sRotY, tRotY)
+      sSkewX = asymLerp(sSkewX, tSkewX)
+      sBgSkew = asymLerp(sBgSkew, tBgSkew)
+      // Stretch uses its own asymmetry (push stretches fast, recovery drags)
+      sBgStretch =
+        sBgStretch +
+        (tBgStretch - sBgStretch) * (tBgStretch > sBgStretch ? 0.18 : 0.05)
 
       const vw = window.innerWidth
       const viewportCenter = vw / 2
@@ -104,15 +189,15 @@ export const Projects = () => {
         const posZ = -Math.abs(offset) * 180 - Math.abs(normalized) * 40
         const scale = 1 - Math.abs(offset) * 0.08 - intensity * 0.03
 
-        el.style.setProperty("--rotY", `${posRotY + vRotY}deg`)
-        el.style.setProperty("--skewX", `${posSkewX + vSkewX}deg`)
+        el.style.setProperty("--rotY", `${posRotY + sRotY}deg`)
+        el.style.setProperty("--skewX", `${posSkewX + sSkewX}deg`)
         el.style.setProperty("--z", `${posZ}px`)
         el.style.setProperty("--scale", `${scale}`)
       }
 
       if (bg) {
-        bg.style.setProperty("--bg-skew", `${normalized * -6}deg`)
-        bg.style.setProperty("--bg-stretch", `${1 + intensity * 0.1}`)
+        bg.style.setProperty("--bg-skew", `${sBgSkew}deg`)
+        bg.style.setProperty("--bg-stretch", `${sBgStretch}`)
       }
 
       raf = requestAnimationFrame(tick)
@@ -121,10 +206,32 @@ export const Projects = () => {
     return () => cancelAnimationFrame(raf)
   }, [isVisible])
 
-  // Card reveal as each enters the pinned area.
+  // ───────────────────────────────────────────────────────────────────────────
+  // CARD ENTRANCE + HUD DECRYPTION
+  // On entry into the pinned horizontal area, the card reveals AND the title
+  // decrypts from noise into locked text. Width is pre-measured & locked with
+  // min-width so the scramble can never cause layout jitter.
+  // ───────────────────────────────────────────────────────────────────────────
   useGSAP(
     () => {
+      const cleanups: Array<() => void> = []
+
+      // Pre-measure + prime with [ CLASSIFIED ] before scramble fires
+      titleRefs.current.forEach((titleEl) => {
+        if (!titleEl) return
+        const w = titleEl.getBoundingClientRect().width
+        if (w > 0) titleEl.style.minWidth = `${Math.ceil(w)}px`
+        titleEl.textContent = "[ CLASSIFIED ]"
+      })
+
+      const containerAnim = ScrollTrigger.getAll().find(
+        (st) => st.pin === containerRef.current,
+      )?.animation
+
       gsap.utils.toArray<HTMLElement>(".project-card-entrance").forEach((card, i) => {
+        const titleEl = titleRefs.current[i]
+        const finalText = projects[i]?.title ?? ""
+
         gsap.fromTo(
           card,
           { opacity: 0, y: 60, filter: "blur(10px)" },
@@ -136,13 +243,17 @@ export const Projects = () => {
             ease: ease.silk,
             scrollTrigger: {
               trigger: card,
-              containerAnimation: ScrollTrigger.getAll().find(
-                (st) => st.pin === containerRef.current
-              )?.animation,
+              containerAnimation: containerAnim,
               start: "left 90%",
             },
             delay: i * 0.05,
-          }
+            onStart: () => {
+              if (titleEl) {
+                const stop = decrypt(titleEl, finalText, 1.2)
+                cleanups.push(stop)
+              }
+            },
+          },
         )
       })
 
@@ -156,10 +267,95 @@ export const Projects = () => {
           stagger: 0.03,
           ease: ease.silk,
           scrollTrigger: { trigger: containerRef.current, start: "top 85%" },
-        }
+        },
       )
+
+      return () => cleanups.forEach((fn) => fn())
     },
-    { scope: containerRef, dependencies: [language] }
+    { scope: containerRef, dependencies: [language] },
+  )
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // NUCLEAR MICRO-INTERACTION — RGB SPLIT GLITCH + SLOW HIGH-TENSION ZOOM
+  // 80ms chromatic aberration spike (steps easing = no smoothing = pure glitch)
+  // followed by a 2.6s expo.out zoom. Leaves the viewer with a sense of
+  // violence → silence.
+  // ───────────────────────────────────────────────────────────────────────────
+  useGSAP(
+    () => {
+      const removers: Array<() => void> = []
+
+      cardRefs.current.forEach((card, i) => {
+        if (!card) return
+        const link = card.querySelector<HTMLAnchorElement>("a")
+        const wrap = imgWrapRefs.current[i]
+        const cR = chromaRRefs.current[i]
+        const cC = chromaCRefs.current[i]
+        if (!link || !wrap) return
+
+        const onEnter = () => {
+          const targets = [wrap, cR, cC].filter(Boolean) as Element[]
+          gsap.killTweensOf(targets)
+
+          // Zlověstný pomalý zoom, který buduje napětí
+          gsap.to(wrap, { opacity: 1, duration: 0.4, ease: "power2.out" })
+          gsap.to(wrap, { scale: 1.12, duration: 4, ease: "power1.out" })
+
+          if (cR && cC) {
+            // Vytvoříme samostatnou timeline s dlouhou pauzou mezi glitchemi (2.2 sekundy klid)
+            const tl = gsap.timeline({ repeat: -1, repeatDelay: 2.2 })
+
+            tl.set([cR, cC], { opacity: 0.9 })
+              // Brutální 40ms roztržení kanálů
+              .to(cR, { x: () => gsap.utils.random(-8, 8), y: () => gsap.utils.random(-4, 4), duration: 0.04, ease: "steps(1)" })
+              .to(cC, { x: () => gsap.utils.random(-8, 8), y: () => gsap.utils.random(-4, 4), duration: 0.04, ease: "steps(1)" }, "<")
+              // Mikrotřesení samotného obrazu ve stejnou chvíli
+              .to(wrap, { x: () => gsap.utils.random(-3, 3), duration: 0.04, ease: "steps(1)" }, "<")
+              // Okamžitý návrat do absolutního klidu (do 40ms)
+              .to([cR, cC], { x: 0, y: 0, opacity: 0, duration: 0.04, ease: "power2.out" })
+              .to(wrap, { x: 0, duration: 0.04, ease: "power2.out" }, "<")
+
+            // Uložíme referenci na timeline přímo na DOM element, abychom ji mohli zabít při onLeave
+            ;(wrap as any).glitchTl = tl
+          }
+        }
+
+        const onLeave = () => {
+          const targets = [wrap, cR, cC].filter(Boolean) as Element[]
+          gsap.killTweensOf(targets)
+          
+          // Bezpečné zabití nekonečné smyčky
+          if ((wrap as any).glitchTl) {
+            ;(wrap as any).glitchTl.kill()
+          }
+
+          // Sametový návrat do původního stavu
+          gsap.to(wrap, {
+            scale: 1,
+            x: 0,
+            y: 0,
+            skewX: 0,
+            opacity: 0.85,
+            duration: 0.8,
+            ease: "power3.out",
+          })
+          
+          if (cR && cC) {
+            gsap.to([cR, cC], { opacity: 0, x: 0, y: 0, duration: 0.15 })
+          }
+        }
+
+        link.addEventListener("mouseenter", onEnter)
+        link.addEventListener("mouseleave", onLeave)
+        removers.push(() => {
+          link.removeEventListener("mouseenter", onEnter)
+          link.removeEventListener("mouseleave", onLeave)
+        })
+      })
+
+      return () => removers.forEach((fn) => fn())
+    },
+    { scope: containerRef },
   )
 
   return (
@@ -202,10 +398,7 @@ export const Projects = () => {
             className="font-syne font-black uppercase tracking-[-0.05em] leading-[0.82] text-white drop-shadow-[0_0_40px_rgba(0,0,0,0.8)]"
             style={{ fontSize: "clamp(5rem, 14vw, 14rem)", fontFeatureSettings: '"ss01","ss02"' }}
           >
-            <span
-              className="block whitespace-nowrap"
-              style={{ clipPath: "inset(0 -100vw 0 0)" }}
-            >
+            <span className="block whitespace-nowrap" style={{ clipPath: "inset(0 -100vw 0 0)" }}>
               <span className="projects-title-char inline-block">{t.titlePart1}</span>
             </span>
             <span
@@ -219,7 +412,7 @@ export const Projects = () => {
           </h2>
           <div className="mt-8 flex items-center gap-4 font-mono text-[10px] tracking-[0.4em] uppercase text-white/40">
             <span className="block h-px w-10 bg-white/30" />
-            <span>Scroll →</span>
+            <span>{"Scroll →"}</span>
           </div>
         </div>
 
@@ -245,7 +438,7 @@ export const Projects = () => {
                 ["--scale" as any]: 1,
                 transform:
                   "rotateY(var(--rotY)) skewX(var(--skewX)) translateZ(var(--z)) scale(var(--scale))",
-                transition: `transform 140ms linear`,
+                // ZMĚNĚNO: Odstraněn CSS transition. Fyziku teď 100% řídí asymLerp v JS.
                 transformStyle: "preserve-3d",
               }}
             >
@@ -268,21 +461,63 @@ export const Projects = () => {
                 data-cursor="hover"
                 className="relative block w-full h-full rounded-xl md:rounded-[2rem] overflow-hidden border border-white/10 bg-[#050505] shadow-[0_40px_80px_rgba(0,0,0,0.9)] pointer-events-auto cursor-pointer"
               >
-                <Image
-                  src={p.image || "/placeholder.svg"}
-                  alt={`Screenshot of ${p.title}`}
-                  fill
-                  draggable={false}
-                  quality={100}
-                  sizes="(max-width: 768px) 85vw, (max-width: 1200px) 60vw, 1100px"
-                  className="object-cover object-top opacity-80 group-hover:opacity-100 group-hover:scale-[1.05] select-none"
-                  style={{
-                    transition: `opacity 1500ms cubic-bezier(0.22, 1, 0.36, 1), transform 1500ms cubic-bezier(0.22, 1, 0.36, 1)`,
+                {/* Primary image — lives inside a GSAP-driven wrapper for the zoom/glitch */}
+                <div
+                  ref={(el) => {
+                    if (el) imgWrapRefs.current[index] = el
                   }}
-                  priority={index === 0}
+                  className="absolute inset-0 will-change-transform transform-gpu"
+                  style={{ opacity: 0.85 }}
+                >
+                  <Image
+                    src={p.image || "/placeholder.svg"}
+                    alt={`Screenshot of ${p.title}`}
+                    fill
+                    draggable={false}
+                    quality={100}
+                    sizes="(max-width: 768px) 85vw, (max-width: 1200px) 60vw, 1100px"
+                    className="object-cover object-top select-none"
+                    priority={index === 0}
+                  />
+                </div>
+
+                {/* RGB split — RED channel (cheap CSS filter hue-shift of the same source) */}
+                <div
+                  ref={(el) => {
+                    if (el) chromaRRefs.current[index] = el
+                  }}
+                  aria-hidden
+                  className="absolute inset-0 pointer-events-none z-10" // ZMĚNĚNO: Přidán z-10
+                  style={{
+                    backgroundImage: `url(${p.image})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "top",
+                    mixBlendMode: "screen",
+                    opacity: 0,
+                    filter: "sepia(1) saturate(14) hue-rotate(-50deg) brightness(1.15)",
+                    willChange: "opacity, transform",
+                  }}
+                />
+                {/* RGB split — CYAN channel */}
+                <div
+                  ref={(el) => {
+                    if (el) chromaCRefs.current[index] = el
+                  }}
+                  aria-hidden
+                  className="absolute inset-0 pointer-events-none z-10" // ZMĚNĚNO: Přidán z-10
+                  style={{
+                    backgroundImage: `url(${p.image})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "top",
+                    mixBlendMode: "screen",
+                    opacity: 0,
+                    filter: "sepia(1) saturate(14) hue-rotate(150deg) brightness(1.15)",
+                    willChange: "opacity, transform",
+                  }}
                 />
 
-                <div className="absolute inset-0 bg-gradient-to-t from-[#020202] via-[#020202]/10 to-transparent opacity-90 pointer-events-none" />
+                {/* ZMĚNĚNO: Přidán z-0, aby gradient podlezl glitch efekt */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#020202] via-[#020202]/10 to-transparent opacity-90 pointer-events-none z-0" />
 
                 <div className="absolute top-6 left-6 md:top-10 md:left-10 z-20 pointer-events-none">
                   <span className="font-mono text-[9px] tracking-[0.4em] text-white/50 uppercase">
@@ -292,10 +527,14 @@ export const Projects = () => {
 
                 <div className="absolute bottom-6 left-6 md:bottom-12 md:left-12 z-20 pointer-events-none">
                   <h3
-                    className="font-syne font-black uppercase tracking-[-0.04em] leading-none text-white group-hover:translate-x-2"
+                    ref={(el) => {
+                      if (el) titleRefs.current[index] = el
+                    }}
+                    className="font-syne font-black uppercase tracking-[-0.04em] leading-none text-white group-hover:translate-x-2 whitespace-nowrap"
                     style={{
                       fontSize: "clamp(2.5rem, 5.5vw, 5rem)",
                       transition: `transform 500ms ${ease.silk}`,
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {p.title}
@@ -316,7 +555,9 @@ export const Projects = () => {
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
                       className="text-white group-hover:text-black group-hover:translate-x-1 group-hover:-translate-y-1"
-                      style={{ transition: `transform 500ms ${ease.silk}, color 500ms ${ease.mechanical}` }}
+                      style={{
+                        transition: `transform 500ms ${ease.silk}, color 500ms ${ease.mechanical}`,
+                      }}
                     >
                       <path
                         d="M1 13L13 1M13 1H4.6M13 1V9.4"

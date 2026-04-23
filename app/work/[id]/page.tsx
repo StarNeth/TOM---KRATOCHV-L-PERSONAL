@@ -1,15 +1,24 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import React, { useEffect, useRef, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import gsap from "gsap"
 import { useGSAP } from "@gsap/react"
 import Link from "next/link"
 import Image from "next/image"
 import dynamic from "next/dynamic"
-const WebGLScene = dynamic(() => import("@/components/webgl/scene").then((mod) => mod.WebGLScene), {
-  ssr: false,
-})
+
+// SSR OFF
+const WebGLSceneDynamic = dynamic(
+  () => import("@/components/webgl/scene").then((mod) => mod.WebGLScene),
+  {
+    ssr: false,
+    loading: () => <div aria-hidden className="fixed inset-0 pointer-events-none" />,
+  }
+)
+
+const WebGLScene = React.memo(WebGLSceneDynamic)
+
 import { useLanguage } from "@/components/navigation/language-toggle"
 import { ease } from "@/lib/easing"
 
@@ -80,33 +89,24 @@ export default function ProjectDetail() {
   const slug = params.id as string
   const { language } = useLanguage()
 
-  const t = DICTIONARY[language as keyof typeof DICTIONARY]
-  const project = t.projects[slug as keyof typeof t.projects]
+  const currentLang = (language as keyof typeof DICTIONARY) || "en"
+  const t = DICTIONARY[currentLang]
+  const project = t?.projects[slug as keyof typeof t.projects]
 
   const containerRef = useRef<HTMLDivElement>(null)
-  const macWindowRef = useRef<HTMLDivElement>(null)
-  const [isFullscreen, setIsFullscreen] = useState(false)
   const isTransitioning = useRef(false)
 
-  // Stable handlers — avoid allocating new function refs on every render,
-  // which was part of what triggered React reconciliation of the Canvas
-  // subtree and the KawaseBlurPass circular-JSON crash.
-  const enterFullscreen = useCallback(() => setIsFullscreen(true), [])
-  const exitFullscreen = useCallback(() => setIsFullscreen(false), [])
-  const toggleFullscreen = useCallback(
-    () => setIsFullscreen((prev) => !prev),
-    []
-  )
-  const returnToWork = useCallback(() => {
-    router.push("/"); // Tohle provede samotný přesun
-  }, [router]);
+  const [webglReady, setWebglReady] = useState(false)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setWebglReady(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
 
   useGSAP(
     () => {
       if (!project) return
       const isMob = window.innerWidth < 1024
 
-      // Curtain wipe — mechanical, deliberate.
       gsap.to(".transition-curtain", {
         opacity: 0,
         duration: isMob ? 0.25 : 0.9,
@@ -114,7 +114,6 @@ export default function ProjectDetail() {
         delay: 0,
       })
 
-      // Character reveal — SILK. Clipped from below, per-letter stagger.
       gsap.fromTo(
         ".detail-title-char",
         { y: "110%" },
@@ -128,7 +127,6 @@ export default function ProjectDetail() {
         }
       )
 
-      // UI meta — DECAY, soft rest.
       gsap.fromTo(
         ".ui-element",
         { y: 30, opacity: 0, filter: "blur(6px)" },
@@ -144,13 +142,6 @@ export default function ProjectDetail() {
         }
       )
 
-      // Mac window entry — BALLISTIC. Subtle overshoot from scale 0.86.
-      // CRITICAL: clearProps: "all" removes the residual CSS transform from
-      // the wrapper after animation. Without this, the wrapper retains a
-      // `transform: translate3d(...)` which becomes the containing block
-      // for any `position: fixed` descendant (CSS spec). That's what was
-      // pushing the fullscreen Mac window off-center into the grid column
-      // instead of centering it in the viewport.
       gsap.fromTo(
         ".mac-window-wrapper",
         { y: 60, opacity: 0, scale: 0.86, filter: "blur(14px)" },
@@ -169,35 +160,6 @@ export default function ProjectDetail() {
     { scope: containerRef, dependencies: [slug, project?.title] }
   )
 
-  // Fullscreen Mac window toggle — ballistic for the morph.
-  useEffect(() => {
-    if (!macWindowRef.current) return
-    if (isFullscreen) {
-      gsap.to(macWindowRef.current, {
-        width: "90vw",
-        height: "85vh",
-        top: "50%",
-        left: "50%",
-        xPercent: -50,
-        yPercent: -50,
-        duration: 0.9,
-        ease: ease.ballistic,
-      })
-    } else {
-      gsap.to(macWindowRef.current, {
-        width: "100%",
-        height: "100%",
-        top: "0%",
-        left: "0%",
-        xPercent: 0,
-        yPercent: 0,
-        duration: 0.9,
-        ease: ease.ballistic,
-      })
-    }
-  }, [isFullscreen])
-
-  // WebGL zone fade-in — silk decay from 0.85 to 0.
   useEffect(() => {
     if (!project) return
     let cleared = false
@@ -231,7 +193,6 @@ export default function ProjectDetail() {
     const currentIndex = PROJECT_ORDER.indexOf(slug)
     const nextSlug = PROJECT_ORDER[(currentIndex + 1) % PROJECT_ORDER.length]
 
-    // Old content dissolves — mechanical commit.
     gsap.to(".ui-element, .title-wrapper, .mac-window-wrapper", {
       opacity: 0,
       y: -20,
@@ -264,10 +225,10 @@ export default function ProjectDetail() {
 
   const handleWheel = useCallback(
     (e: WheelEvent) => {
-      if (isFullscreen || !window.matchMedia("(pointer: fine)").matches) return
+      if (!window.matchMedia("(pointer: fine)").matches) return
       if (e.deltaY > 60) triggerNextProject()
     },
-    [isFullscreen, triggerNextProject]
+    [triggerNextProject]
   )
 
   useEffect(() => {
@@ -284,10 +245,10 @@ export default function ProjectDetail() {
     >
       <div className="transition-curtain fixed inset-0 z-[9999] bg-[#020203] pointer-events-none" />
 
-      <WebGLScene />
+      {webglReady && <WebGLScene />}
 
       <div key={slug} className="relative w-full min-h-[100svh] flex flex-col">
-      <nav className="relative lg:absolute top-0 left-0 w-full pt-10 pb-4 px-6 md:px-10 z-[100] flex justify-between items-start pointer-events-none ui-element">
+        <nav className="relative lg:absolute top-0 left-0 w-full pt-10 pb-4 px-6 md:px-10 z-[100] flex justify-between items-start pointer-events-none ui-element">
           <Link
             href="/"
             className="group font-mono text-[10px] tracking-[0.2em] uppercase text-white pointer-events-auto flex items-center gap-4 hover:text-white/60"
@@ -304,17 +265,10 @@ export default function ProjectDetail() {
         <div className="w-full h-full flex-1 flex flex-col lg:justify-center px-6 md:px-12 lg:px-20 pb-32 lg:pb-0">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 xl:gap-24 w-full max-w-[1920px] mx-auto items-center">
             <div
-              className={`col-span-1 lg:col-span-5 flex flex-col gap-6 lg:gap-8 z-10 mt-4 lg:mt-0 ${
-                isFullscreen ? "opacity-0 translate-x-[-50px] pointer-events-none" : "opacity-100 translate-x-0"
-              }`}
-              style={{ transition: `opacity 700ms ${ease.silk}, transform 700ms ${ease.silk}` }}
+              className="col-span-1 lg:col-span-5 flex flex-col gap-6 lg:gap-8 z-10 mt-4 lg:mt-0 opacity-100 translate-x-0"
             >
               <div className="title-wrapper pb-4 min-h-[5rem] flex flex-wrap gap-x-4 md:gap-x-6">
                 {project.title.split(" ").map((word, i) => (
-                  // Mask uses clip-path (vertical-only) instead of
-                  // overflow-hidden. This preserves the y:110% reveal from
-                  // below while allowing the rightmost letter to render
-                  // its full glyph envelope (fixes "BARBEF" → "BARBER").
                   <span
                     key={i}
                     className="flex pb-4"
@@ -329,9 +283,6 @@ export default function ProjectDetail() {
                         className="detail-title-char font-syne font-black uppercase tracking-[-0.05em] leading-[0.82] text-white inline-block"
                         style={{
                           fontSize: "clamp(3.5rem, 10vw, 7.5rem)",
-                          // Small right padding per-char with matching negative
-                          // margin — same optical spacing as the old code but
-                          // no longer collides with the mask's right edge.
                           paddingRight: j === word.length - 1 ? "0.08em" : "0.22em",
                           marginRight: j === word.length - 1 ? "0" : "-0.22em",
                         }}
@@ -396,33 +347,17 @@ export default function ProjectDetail() {
               )}
             </div>
 
-            {/* Mac window — ballistic entrance, ballistic fullscreen morph */}
             <div className="mac-window-wrapper col-span-1 lg:col-span-7 relative h-[60vh] lg:h-[75vh] w-full z-[150] mt-10 lg:mt-0">
               <div
-                className={`fixed inset-0 z-[998] ${
-                  isFullscreen ? "bg-black/80 backdrop-blur-md pointer-events-auto opacity-100" : "bg-transparent pointer-events-none opacity-0"
-                }`}
-                style={{ transition: `opacity 700ms ${ease.silk}, backdrop-filter 700ms ${ease.silk}` }}
-                onClick={exitFullscreen}
-              />
-
-              <div
-                ref={macWindowRef}
-                className={`absolute top-0 left-0 w-full h-full overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.7)] lg:shadow-[0_60px_120px_rgba(0,0,0,0.85)] bg-[#050505] border border-white/10 flex flex-col rounded-[2rem] lg:rounded-[2.5rem] ${
-                  isFullscreen ? "fixed z-[999]" : ""
-                }`}
+                className="absolute top-0 left-0 w-full h-full overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.7)] lg:shadow-[0_60px_120px_rgba(0,0,0,0.85)] bg-[#050505] border border-white/10 flex flex-col rounded-[2rem] lg:rounded-[2.5rem]"
               >
                 <div className="w-full h-10 lg:h-12 flex-shrink-0 border-b border-white/5 flex items-center justify-between px-4 lg:px-6 bg-[#111111]/95 backdrop-blur-md group/mac relative z-10 cursor-default">
                   <div className="flex gap-2 lg:gap-2.5">
-                  <button
+                    {/* Červené zavře projekt a vrátí na Home */}
+                    <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (isFullscreen) {
-                          exitFullscreen()
-                        } else {
-                          // Pokud nejsme ve fullscreenu, červené tlačítko simuluje "Zavření projektu" = Návrat domů
-                          router.push("/")
-                        }
+                        router.push("/")
                       }}
                       className="w-3 h-3 lg:w-3.5 lg:h-3.5 rounded-full bg-[#ff5f56] flex items-center justify-center outline-none cursor-pointer"
                     >
@@ -430,28 +365,17 @@ export default function ProjectDetail() {
                         ✕
                       </span>
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        exitFullscreen()
-                      }}
-                      className="w-3 h-3 lg:w-3.5 lg:h-3.5 rounded-full bg-[#ffbd2e] flex items-center justify-center outline-none cursor-pointer"
-                    >
+                    {/* Žluté a zelené jen pro design */}
+                    <div className="w-3 h-3 lg:w-3.5 lg:h-3.5 rounded-full bg-[#ffbd2e] flex items-center justify-center">
                       <span className="opacity-0 group-hover/mac:opacity-100 text-[#593e00] text-[8px] leading-none mb-[1px] font-bold">
                         −
                       </span>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleFullscreen()
-                      }}
-                      className="w-3 h-3 lg:w-3.5 lg:h-3.5 rounded-full bg-[#27c93f] flex items-center justify-center outline-none cursor-pointer"
-                    >
+                    </div>
+                    <div className="w-3 h-3 lg:w-3.5 lg:h-3.5 rounded-full bg-[#27c93f] flex items-center justify-center">
                       <span className="opacity-0 group-hover/mac:opacity-100 text-[#004d00] text-[8px] leading-none mb-[1px] font-bold">
                         ⤢
                       </span>
-                    </button>
+                    </div>
                   </div>
                   <div className="font-mono text-[8px] lg:text-[9px] text-white/30 tracking-widest uppercase pointer-events-none">
                     {new URL(project.liveUrl === "#" ? "https://internal.system" : project.liveUrl).hostname}
@@ -460,7 +384,7 @@ export default function ProjectDetail() {
                 </div>
 
                 <div
-                  className="w-full h-full overflow-y-auto custom-scrollbar relative bg-[#020202] z-10 overscroll-none"
+                  className="w-full h-full overflow-y-auto custom-scrollbar relative bg-[#020202] z-10 overscroll-none pointer-events-auto"
                   data-lenis-prevent="true"
                   onWheel={(e) => e.stopPropagation()}
                   onTouchMove={(e) => e.stopPropagation()}
@@ -515,9 +439,7 @@ export default function ProjectDetail() {
         </div>
 
         <div
-          className={`hidden desktop-indicator absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 flex-col items-center gap-4 ${
-            isFullscreen ? "opacity-0" : "opacity-100"
-          } mix-blend-difference pointer-events-none ui-element`}
+          className="hidden desktop-indicator absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 flex-col items-center gap-4 opacity-100 mix-blend-difference pointer-events-none ui-element"
           style={{ transition: `opacity 500ms ${ease.silk}` }}
         >
           <span className="font-mono text-[8px] uppercase tracking-[0.4em] text-white/50 text-center">Iterate Sequence</span>

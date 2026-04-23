@@ -252,6 +252,67 @@ const MobileMenuOverlay = ({
   )
 }
 
+// ── TELEMETRY ───────────────────────────────────────────────────────────
+// The previous ugly fixed bottom bar has been killed. The three live
+// values (SYS_DEPTH / FPS / UPTIME) are now page metadata — 7–8px
+// monospace annotations sitting inside the existing header row at 40%
+// opacity, written imperatively via refs so React never re-renders.
+const pad2 = (n: number) => n.toString().padStart(2, "0")
+const pad4 = (n: number) => n.toString().padStart(4, "0")
+
+type TelemetryRefs = {
+  depth:  React.RefObject<HTMLSpanElement | null>
+  fps:    React.RefObject<HTMLSpanElement | null>
+  uptime: React.RefObject<HTMLSpanElement | null>
+}
+
+const useTelemetry = (): TelemetryRefs => {
+  // Inicializace s null je standard
+  const depth  = useRef<HTMLSpanElement>(null)
+  const fps    = useRef<HTMLSpanElement>(null)
+  const uptime = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const sessionStart = performance.now()
+    let frames = 0
+    let fpsLastT = performance.now()
+    let raf = 0
+
+    const tick = (now: number) => {
+      frames++
+
+      // Safe check pomocí optional chainingu nebo ifu
+      if (depth.current) {
+        depth.current.textContent = pad4(Math.max(0, Math.round(window.scrollY)))
+      }
+
+      if (uptime.current) {
+        const secs = Math.floor((now - sessionStart) / 1000)
+        const h = Math.floor(secs / 3600)
+        const m = Math.floor((secs % 3600) / 60)
+        const s = secs % 60
+        uptime.current.textContent = `${pad2(h)}:${pad2(m)}:${pad2(s)}`
+      }
+
+      if (now - fpsLastT > 500 && fps.current) {
+        const v = Math.round((frames * 1000) / (now - fpsLastT))
+        fps.current.textContent = pad2(Math.min(99, v))
+        frames = 0
+        fpsLastT = now
+      }
+
+      raf = requestAnimationFrame(tick)
+    }
+
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  return { depth, fps, uptime }
+}
+
 // ── HAMBURGER ───────────────────────────────────────────────────────────
 const HamburgerButton = ({ isOpen, onClick }: { isOpen: boolean; onClick: () => void }) => {
   const line1Ref = useRef<HTMLDivElement>(null)
@@ -295,6 +356,9 @@ export const Header = () => {
   const [scrollProg, setScrollProg] = useState<number>(0)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+
+  // Live telemetry — DOM refs, not state. Zero re-renders per frame.
+  const telemetry = useTelemetry()
 
   useEffect(() => {
     const updateTime = () => setTime(new Date().toLocaleTimeString("cs-CZ", { hour12: false }))
@@ -434,6 +498,30 @@ export const Header = () => {
               <Activity className="w-3 h-3 text-white" />
               <span className="text-white">{scrollProg.toString().padStart(2, "0")}%</span>
             </div>
+          </div>
+
+          {/* Live page metadata — NOT a UI element. Tiny, monospace, 40%
+              opacity. Sits under the primary HUD row as a second line of
+              "system annotations" that confirms the live, instrumented
+              nature of the page. No visual weight; pure typographic
+              signal. Hidden on mobile where vertical space is precious. */}
+          <div
+            aria-hidden
+            className="sys-element hidden md:flex justify-end items-center gap-x-4 mt-1.5 font-mono text-[8px] tracking-[0.22em] uppercase text-white/40 select-none pointer-events-none"
+          >
+            <span className="flex items-center gap-1">
+              <span className="opacity-60">SYS_DEPTH</span>
+              <span ref={telemetry.depth} className="tabular-nums">0000</span>
+              <span className="opacity-50">PX</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="opacity-60">FPS</span>
+              <span ref={telemetry.fps} className="tabular-nums">60</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="opacity-60">UPTIME</span>
+              <span ref={telemetry.uptime} className="tabular-nums">00:00:00</span>
+            </span>
           </div>
 
           <nav className="sys-element relative hidden md:block w-[400px] h-[130px] mt-6">
