@@ -66,39 +66,12 @@ import { useMobile } from "@/hooks/use-mobile"
 import { useWebGLSupport } from "@/hooks/use-webgl-support"
 import { CSSFallbackGradient } from "./css-fallback-gradient"
 import { velocityBus } from "@/lib/velocity-bus"
-
-// ─── CURSOR BUS ──────────────────────────────────────────────────────────────
-// Module-level singleton consumed by both the cursor.tsx HUD and the shader.
-// The cursor writes target position + raw pixel velocity here every rAF tick;
-// the shader reads in useFrame. No events, no React state — pure refs.
-type CursorState = {
-  x: number        // normalized [-aspect, aspect] (aspect applied in shader)
-  y: number        // normalized [-1, 1]
-  vx: number       // smoothed dx / frame in normalized space
-  vy: number       // smoothed dy / frame in normalized space
-  energy: number   // 0..1 — motion energy, decays ~0.86/frame when idle
-}
-
-const cursorBusState: CursorState = { x: 0, y: 0, vx: 0, vy: 0, energy: 0 }
-
-export const cursorBus = {
-  get: () => cursorBusState,
-  /** Pixel-space write from cursor.tsx — normalizes internally. */
-  writePixel(px: number, py: number) {
-    const nx = (px / window.innerWidth)  * 2 - 1
-    const ny = -(py / window.innerHeight) * 2 + 1
-    const dx = nx - cursorBusState.x
-    const dy = ny - cursorBusState.y
-    const mag = Math.hypot(dx, dy)
-    // Exponential smoothing for velocity; burst on fast movement
-    cursorBusState.vx = cursorBusState.vx * 0.72 + dx * 0.28
-    cursorBusState.vy = cursorBusState.vy * 0.72 + dy * 0.28
-    // Energy saturates fast, decays slow (handled in useFrame)
-    cursorBusState.energy = Math.min(1, cursorBusState.energy + mag * 6)
-    cursorBusState.x = nx
-    cursorBusState.y = ny
-  },
-}
+// cursorBus lives in its own file so cursor.tsx (statically imported by
+// the root layout on every route — including /work/[id]) doesn't drag
+// `three` and `@react-three/postprocessing` into the SSR module graph.
+// Those libraries reference `window` at module init and blow up the
+// server render. See lib/cursor-bus.ts for the full rationale.
+import { cursorBus } from "@/lib/cursor-bus"
 
 type LiquidProps = { isMobile: boolean; onFirstFrame: () => void }
 

@@ -7,9 +7,18 @@ import { useGSAP } from "@gsap/react"
 import Link from "next/link"
 import Image from "next/image"
 import dynamic from "next/dynamic"
-const WebGLScene = dynamic(() => import("@/components/webgl/scene").then((mod) => mod.WebGLScene), {
-  ssr: false,
-})
+// SSR must be OFF for this chunk — WebGLScene pulls in `three` and
+// `@react-three/postprocessing`, and the latter touches `window` at
+// module init. Forcing ssr:false ships it as a client-only chunk.
+// A sentinel <div /> is rendered during SSR & first paint so the DOM
+// layout is stable before React 19 hydration swaps in the canvas.
+const WebGLScene = dynamic(
+  () => import("@/components/webgl/scene").then((mod) => mod.WebGLScene),
+  {
+    ssr: false,
+    loading: () => <div aria-hidden className="fixed inset-0 pointer-events-none" />,
+  }
+)
 import { useLanguage } from "@/components/navigation/language-toggle"
 import { ease } from "@/lib/easing"
 
@@ -87,6 +96,16 @@ export default function ProjectDetail() {
   const macWindowRef = useRef<HTMLDivElement>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const isTransitioning = useRef(false)
+
+  // WebGL mount-gate — matches the root page's pattern. Delays Canvas
+  // creation by one tick so hydration fully settles before the heavy
+  // GL context is allocated. Eliminates the "This page couldn't load"
+  // race on navigation from /.
+  const [webglReady, setWebglReady] = useState(false)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setWebglReady(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
 
   // Stable handlers — avoid allocating new function refs on every render,
   // which was part of what triggered React reconciliation of the Canvas
@@ -284,7 +303,7 @@ export default function ProjectDetail() {
     >
       <div className="transition-curtain fixed inset-0 z-[9999] bg-[#020203] pointer-events-none" />
 
-      <WebGLScene />
+      {webglReady && <WebGLScene />}
 
       <div key={slug} className="relative w-full min-h-[100svh] flex flex-col">
       <nav className="relative lg:absolute top-0 left-0 w-full pt-10 pb-4 px-6 md:px-10 z-[100] flex justify-between items-start pointer-events-none ui-element">

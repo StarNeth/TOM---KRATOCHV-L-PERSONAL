@@ -22,7 +22,12 @@
  */
 
 import { useEffect, useRef, useState } from "react"
-import { cursorBus } from "@/components/webgl/scene"
+// Import from the standalone lib module — NOT from components/webgl/scene.
+// cursor.tsx renders on every page (including /work/[id]) via the root
+// layout. Importing the scene module statically would drag `three` and
+// `@react-three/postprocessing` into the SSR graph and crash the server
+// render (postprocessing touches `window` at module init).
+import { cursorBus } from "@/lib/cursor-bus"
 
 // 60Hz baseline values. Effective lerp = 1 - (1 - baseLerp)^refreshScale
 // where refreshScale = 60 / actualHz. This guarantees identical perceptual
