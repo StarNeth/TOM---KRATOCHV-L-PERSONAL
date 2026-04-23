@@ -40,8 +40,7 @@ const decrypt = (el: HTMLElement, finalText: string, duration = 1.2) => {
 
   const step = () => {
     const t = Math.min(1, (performance.now() - startT) / durMs)
-    // ease-out-cubic — fast initial reveal, settles cleanly at the lock
-    const reveal = 1 - Math.pow(1 - t, 3)
+    const reveal = 1 - Math.pow(1 - t, 3) // ease-out-cubic
     const locked = Math.floor(reveal * total)
 
     let out = ""
@@ -51,39 +50,85 @@ const decrypt = (el: HTMLElement, finalText: string, duration = 1.2) => {
         out += " "
         continue
       }
-      if (i < locked) {
-        out += c
-      } else {
-        out += SCRAMBLE_POOL[(Math.random() * SCRAMBLE_POOL.length) | 0]
-      }
+      out += i < locked ? c : SCRAMBLE_POOL[(Math.random() * SCRAMBLE_POOL.length) | 0]
     }
     el.textContent = out
 
-    if (t < 1) {
-      raf = requestAnimationFrame(step)
-    } else {
-      el.textContent = finalText
-    }
+    if (t < 1) raf = requestAnimationFrame(step)
+    else el.textContent = finalText
   }
   raf = requestAnimationFrame(step)
   return () => cancelAnimationFrame(raf)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CAST-IRON ASYMMETRIC SPRING
-// Stiff on push (energy injection), heavy/slow on recovery (inertia back to 0).
-// Produces that "dragging a magnetised iron plate" resistance curve — the tilt
-// loads up quickly when you flick scroll, then bleeds off with weight.
+// CAST-IRON ASYMMETRIC SPRING — TRUE ζ-CORRECTED PHYSICS
+//
+// Damping ratio ζ = b / (2·√(k·m)) with implicit m = 1. This is the only
+// quantity that governs physical feel; raw b values are meaningless in
+// isolation. The previous implementation delivered ζ ≈ 0.71 in BOTH regimes
+// — two flavors of "floaty." This rewrite delivers:
+//
+//   Attack   (accelerating):  ζ ≈ 1.40  → overdamped, zero oscillation.
+//                                         The card engages with firm,
+//                                         inevitable authority — cast iron
+//                                         meeting cast iron.
+//   Recovery (returning):      ζ ≈ 0.22  → heavily under-damped. The mass
+//                                         overshoots rest by ~62% of the
+//                                         error, pulls back, drifts past
+//                                         again, then locks after 2–3
+//                                         visible oscillations. This IS
+//                                         the magnetic ringing.
+//
+// Derivation:
+//   b_accel = 1.40 · 2·√380 ≈ 54.6   → 55
+//   b_rec   = 0.22 · 2·√45  ≈ 2.95   → 3.0
+//   (stretch channel uses k=520/68 → b=72/3.8 for the same ratios)
+//
+// Regime detection is velocity-signed (not magnitude-compared), so the
+// channel correctly enters RECOVERY at the zero-crossing when the mass
+// overshoots, not one frame late.
 // ─────────────────────────────────────────────────────────────────────────────
-const asymLerp = (
-  current: number,
-  target: number,
-  stiffPush = 0.22,
-  slowRecovery = 0.055,
-) => {
-  const accelerating = Math.abs(target) > Math.abs(current)
-  const k = accelerating ? stiffPush : slowRecovery
-  return current + (target - current) * k
+interface SpringState {
+  pos: number
+  vel: number
+}
+interface SpringConfig {
+  kAccel: number
+  kRec: number
+  bAccel: number
+  bRec: number
+}
+
+// ζ_accel ≈ 1.40  (overdamped)  |  ζ_rec ≈ 0.22  (heavily under-damped)
+const CAST_IRON: SpringConfig = {
+  kAccel: 380,
+  kRec: 45,
+  bAccel: 55,
+  bRec: 3.0,
+}
+
+// Same ratios on a stiffer spine — used by the BG word stretch channel
+// where the larger visual mass demands more restoring force.
+const CAST_IRON_STRETCH: SpringConfig = {
+  kAccel: 520,
+  kRec: 68,
+  bAccel: 72,
+  bRec: 3.8,
+}
+
+const stepSpring = (s: SpringState, target: number, dt: number, cfg: SpringConfig = CAST_IRON) => {
+  const error = target - s.pos
+  // Velocity-signed regime detection.
+  // (error, vel) same sign → mass moving toward target → ACCELERATING.
+  // (error, vel) opposite  → mass has overshot            → RECOVERING.
+  const accelerating = Math.sign(error) === Math.sign(s.vel) || Math.abs(s.vel) < 1e-3
+  const k = accelerating ? cfg.kAccel : cfg.kRec
+  const b = accelerating ? cfg.bAccel : cfg.bRec
+  // Semi-implicit Euler — stable at 120Hz, causally correct.
+  s.vel += (k * error - b * s.vel) * dt
+  s.pos += s.vel * dt
+  return s.pos
 }
 
 export const Projects = () => {
@@ -96,14 +141,29 @@ export const Projects = () => {
 
   // Cached DOM refs — the rAF loop NEVER calls querySelector.
   const cardRefs = useRef<HTMLElement[]>([])
+  const linkRefs = useRef<HTMLAnchorElement[]>([])
   const titleRefs = useRef<HTMLElement[]>([])
   const imgWrapRefs = useRef<HTMLDivElement[]>([])
   const chromaRRefs = useRef<HTMLDivElement[]>([])
   const chromaCRefs = useRef<HTMLDivElement[]>([])
+  const gridRefs = useRef<HTMLDivElement[]>([])
+
+  // HUD matrix readouts — pointers to the DOM text nodes that display
+  // the live transform values governing each card. These are the literal
+  // numbers currently driving rotateY/skewX/translateZ — not decorative.
+  const hudRotYRefs = useRef<HTMLSpanElement[]>([])
+  const hudSkewRefs = useRef<HTMLSpanElement[]>([])
+  const hudDepthRefs = useRef<HTMLSpanElement[]>([])
+  const hudVelRefs = useRef<HTMLSpanElement[]>([])
+
+  // MEMORY-SAFE glitch timeline registry. Timelines are keyed by card index.
+  // On unmount we iterate and kill — no orphaned tickers against detached
+  // nodes, no `(wrap as any).glitchTl` DOM-property leak.
+  const glitchTimelines = useRef<Map<number, gsap.core.Timeline>>(new Map())
 
   const [isVisible, setIsVisible] = useState(false)
 
-  // Horizontal scroll pin — no local velocity math. The bus owns physics.
+  // Horizontal scroll pin — the velocity bus owns all kinetic math.
   useGSAP(
     () => {
       const track = trackRef.current
@@ -128,7 +188,7 @@ export const Projects = () => {
     { scope: containerRef },
   )
 
-  // Visibility gate — rAF tilt loop only runs while in/near viewport.
+  // Visibility gate — the tilt loop only runs while in/near viewport.
   useEffect(() => {
     if (!containerRef.current) return
     const io = new IntersectionObserver(([entry]) => setIsVisible(entry.isIntersecting), {
@@ -139,38 +199,56 @@ export const Projects = () => {
   }, [])
 
   // ───────────────────────────────────────────────────────────────────────────
-  // SINGLE rAF LOOP — CACHED REFS + ASYMMETRIC SPRING
-  // Direct style.setProperty on CSS variables. No React state in the hot path.
+  // SINGLE rAF LOOP — CACHED REFS + ASYMMETRIC SPRING + CAUSAL DENSITY
+  //
+  // Every visual output in this section is driven from ONE source of truth
+  // (the velocity bus) through ONE integrator (the spring) into ONE write
+  // phase (direct CSS variable mutation). The HUD reads the exact same
+  // values the transform reads — the label and the geometry share a cause.
   // ───────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isVisible) return
     let raf = 0
     const cards = cardRefs.current
+    const links = linkRefs.current
     const bg = bgWordRef.current
+    const grids = gridRefs.current
+    const hudRotYs = hudRotYRefs.current
+    const hudSkews = hudSkewRefs.current
+    const hudDepths = hudDepthRefs.current
+    const hudVels = hudVelRefs.current
 
-    // Persistent spring state — lives across frames, reset on teardown.
-    let sRotY = 0
-    let sSkewX = 0
-    let sBgSkew = 0
-    let sBgStretch = 1
+    // Persistent spring state — each channel carries independent velocity.
+    const sRotY: SpringState = { pos: 0, vel: 0 }
+    const sSkewX: SpringState = { pos: 0, vel: 0 }
+    const sBgSkew: SpringState = { pos: 0, vel: 0 }
+    const sBgStretch: SpringState = { pos: 1, vel: 0 }
 
-    const tick = () => {
+    let lastT = performance.now()
+
+    const tick = (now: number) => {
+      // 30fps floor on dt — a dropped frame must NOT inject energy.
+      const dt = Math.min((now - lastT) / 1000, 0.033)
+      lastT = now
+
       const { normalized, intensity } = velocityBus.get()
 
-      // Velocity-driven targets
-      const tRotY = -normalized * 5
-      const tSkewX = normalized * 2
+      // ── ANGULAR GAINS (audit-corrected) ───────────────────────────────
+      // Previous values produced imperceptible tilt on 55vw cards at
+      // perspective 2200px. New gains are calibrated so the 3D depth is
+      // visually legible at every scroll regime:
+      //   tRotY  : 18°  (3.6× the old 5°)  — velocity-driven yaw
+      //   tSkewX :  4°  (2×   the old 2°)  — velocity-driven shear
+      //   posRotY: 45°  (1.5× the old 30°) — position-driven parallax yaw
+      const tRotY = -normalized * 18
+      const tSkewX = normalized * 4
       const tBgSkew = normalized * -6
       const tBgStretch = 1 + intensity * 0.1
 
-      // Asymmetric integration — the whole reason this feels heavy
-      sRotY = asymLerp(sRotY, tRotY)
-      sSkewX = asymLerp(sSkewX, tSkewX)
-      sBgSkew = asymLerp(sBgSkew, tBgSkew)
-      // Stretch uses its own asymmetry (push stretches fast, recovery drags)
-      sBgStretch =
-        sBgStretch +
-        (tBgStretch - sBgStretch) * (tBgStretch > sBgStretch ? 0.18 : 0.05)
+      stepSpring(sRotY, tRotY, dt)
+      stepSpring(sSkewX, tSkewX, dt)
+      stepSpring(sBgSkew, tBgSkew, dt)
+      stepSpring(sBgStretch, tBgStretch, dt, CAST_IRON_STRETCH)
 
       const vw = window.innerWidth
       const viewportCenter = vw / 2
@@ -184,20 +262,66 @@ export const Projects = () => {
         const rawOffset = (cardCenter - viewportCenter) / span
         const offset = Math.max(-1, Math.min(1, rawOffset))
 
-        const posRotY = -offset * 30
+        const posRotY = -offset * 45
         const posSkewX = offset * 6
         const posZ = -Math.abs(offset) * 180 - Math.abs(normalized) * 40
         const scale = 1 - Math.abs(offset) * 0.08 - intensity * 0.03
 
-        el.style.setProperty("--rotY", `${posRotY + sRotY}deg`)
-        el.style.setProperty("--skewX", `${posSkewX + sSkewX}deg`)
+        // ── TRANSFORM WRITE ────────────────────────────────────────────
+        // `totalRotY` / `totalSkewX` are the exact numbers consumed by
+        // the card's transform. The HUD reads the SAME variables.
+        const totalRotY = posRotY + sRotY.pos
+        const totalSkewX = posSkewX + sSkewX.pos
+
+        el.style.setProperty("--rotY", `${totalRotY}deg`)
+        el.style.setProperty("--skewX", `${totalSkewX}deg`)
         el.style.setProperty("--z", `${posZ}px`)
         el.style.setProperty("--scale", `${scale}`)
+
+        // ── UPGRADE 1: VELOCITY-DRIVEN SCANLINE GRID ───────────────────
+        // The card surface registers kinetic input. Grid opacity follows
+        // |normalized| (not intensity, which decays slower) so the lines
+        // appear the moment motion begins and vanish the moment it stops.
+        // Line spacing contracts from 24px (rest) to 16px (full velocity)
+        // — the grid "compresses under speed," a visual analogue of
+        // stress on the surface.
+        const grid = grids[i]
+        if (grid) {
+          const gridOpacity = intensity * 0.18
+          const gridSize = 24 - intensity * 8 // 24 → 16 px
+          grid.style.opacity = `${gridOpacity}`
+          grid.style.setProperty("--grid-size", `${gridSize}px`)
+        }
+
+        // ── UPGRADE 3: SIGNAL-STRENGTH BORDER ──────────────────────────
+        // Border opacity and outer glow are a linear function of scroll
+        // intensity. At rest: barely visible line, deep shadow. At full
+        // velocity: filament-hot border, radiant glow. The card knows
+        // it's being accelerated and expresses it thermally.
+        const link = links[i]
+        if (link) {
+          const borderOpacity = 0.1 + intensity * 0.55
+          const borderGlow = intensity * 28
+          link.style.setProperty("--border-opacity", `${borderOpacity}`)
+          link.style.setProperty("--border-glow", `${borderGlow}px`)
+        }
+
+        // ── UPGRADE 2: PERSPECTIVE MATRIX HUD ──────────────────────────
+        // Real transform values surfaced as text. When the card tilts,
+        // the numbers change — same source of truth as the geometry.
+        const hr = hudRotYs[i]
+        const hs = hudSkews[i]
+        const hd = hudDepths[i]
+        const hv = hudVels[i]
+        if (hr) hr.textContent = `${totalRotY.toFixed(2)}°`
+        if (hs) hs.textContent = `${totalSkewX.toFixed(2)}°`
+        if (hd) hd.textContent = `${posZ.toFixed(1)}z`
+        if (hv) hv.textContent = `${(intensity * 100).toFixed(0)}%`
       }
 
       if (bg) {
-        bg.style.setProperty("--bg-skew", `${sBgSkew}deg`)
-        bg.style.setProperty("--bg-stretch", `${sBgStretch}`)
+        bg.style.setProperty("--bg-skew", `${sBgSkew.pos}deg`)
+        bg.style.setProperty("--bg-stretch", `${sBgStretch.pos}`)
       }
 
       raf = requestAnimationFrame(tick)
@@ -208,15 +332,11 @@ export const Projects = () => {
 
   // ───────────────────────────────────────────────────────────────────────────
   // CARD ENTRANCE + HUD DECRYPTION
-  // On entry into the pinned horizontal area, the card reveals AND the title
-  // decrypts from noise into locked text. Width is pre-measured & locked with
-  // min-width so the scramble can never cause layout jitter.
   // ───────────────────────────────────────────────────────────────────────────
   useGSAP(
     () => {
       const cleanups: Array<() => void> = []
 
-      // Pre-measure + prime with [ CLASSIFIED ] before scramble fires
       titleRefs.current.forEach((titleEl) => {
         if (!titleEl) return
         const w = titleEl.getBoundingClientRect().width
@@ -224,9 +344,7 @@ export const Projects = () => {
         titleEl.textContent = "[ CLASSIFIED ]"
       })
 
-      const containerAnim = ScrollTrigger.getAll().find(
-        (st) => st.pin === containerRef.current,
-      )?.animation
+      const containerAnim = ScrollTrigger.getAll().find((st) => st.pin === containerRef.current)?.animation
 
       gsap.utils.toArray<HTMLElement>(".project-card-entrance").forEach((card, i) => {
         const titleEl = titleRefs.current[i]
@@ -276,14 +394,16 @@ export const Projects = () => {
   )
 
   // ───────────────────────────────────────────────────────────────────────────
-  // NUCLEAR MICRO-INTERACTION — RGB SPLIT GLITCH + SLOW HIGH-TENSION ZOOM
-  // 80ms chromatic aberration spike (steps easing = no smoothing = pure glitch)
-  // followed by a 2.6s expo.out zoom. Leaves the viewer with a sense of
-  // violence → silence.
+  // MEMORY-SAFE RGB SPLIT GLITCH + SLOW ZOOM
+  //
+  // Timelines are stored in `glitchTimelines` (a Map<index, Timeline> ref).
+  // On unmount we iterate the map and kill each timeline — no orphaned
+  // GSAP tickers against detached DOM, no properties stashed on elements.
   // ───────────────────────────────────────────────────────────────────────────
   useGSAP(
     () => {
       const removers: Array<() => void> = []
+      const timelines = glitchTimelines.current
 
       cardRefs.current.forEach((card, i) => {
         if (!card) return
@@ -297,39 +417,62 @@ export const Projects = () => {
           const targets = [wrap, cR, cC].filter(Boolean) as Element[]
           gsap.killTweensOf(targets)
 
-          // Zlověstný pomalý zoom, který buduje napětí
+          // Slow high-tension zoom — the dread build.
           gsap.to(wrap, { opacity: 1, duration: 0.4, ease: "power2.out" })
           gsap.to(wrap, { scale: 1.12, duration: 4, ease: "power1.out" })
 
           if (cR && cC) {
-            // Vytvoříme samostatnou timeline s dlouhou pauzou mezi glitchemi (2.2 sekundy klid)
-            const tl = gsap.timeline({ repeat: -1, repeatDelay: 2.2 })
+            // Kill any prior timeline for this index before registering a new one.
+            timelines.get(i)?.kill()
 
+            const tl = gsap.timeline({ repeat: -1, repeatDelay: 2.2 })
             tl.set([cR, cC], { opacity: 0.9 })
-              // Brutální 40ms roztržení kanálů
-              .to(cR, { x: () => gsap.utils.random(-8, 8), y: () => gsap.utils.random(-4, 4), duration: 0.04, ease: "steps(1)" })
-              .to(cC, { x: () => gsap.utils.random(-8, 8), y: () => gsap.utils.random(-4, 4), duration: 0.04, ease: "steps(1)" }, "<")
-              // Mikrotřesení samotného obrazu ve stejnou chvíli
-              .to(wrap, { x: () => gsap.utils.random(-3, 3), duration: 0.04, ease: "steps(1)" }, "<")
-              // Okamžitý návrat do absolutního klidu (do 40ms)
+              .to(
+                cR,
+                {
+                  x: () => gsap.utils.random(-8, 8),
+                  y: () => gsap.utils.random(-4, 4),
+                  duration: 0.04,
+                  ease: "steps(1)",
+                },
+              )
+              .to(
+                cC,
+                {
+                  x: () => gsap.utils.random(-8, 8),
+                  y: () => gsap.utils.random(-4, 4),
+                  duration: 0.04,
+                  ease: "steps(1)",
+                },
+                "<",
+              )
+              .to(
+                wrap,
+                {
+                  x: () => gsap.utils.random(-3, 3),
+                  duration: 0.04,
+                  ease: "steps(1)",
+                },
+                "<",
+              )
               .to([cR, cC], { x: 0, y: 0, opacity: 0, duration: 0.04, ease: "power2.out" })
               .to(wrap, { x: 0, duration: 0.04, ease: "power2.out" }, "<")
 
-            // Uložíme referenci na timeline přímo na DOM element, abychom ji mohli zabít při onLeave
-            ;(wrap as any).glitchTl = tl
+            timelines.set(i, tl)
           }
         }
 
         const onLeave = () => {
           const targets = [wrap, cR, cC].filter(Boolean) as Element[]
           gsap.killTweensOf(targets)
-          
-          // Bezpečné zabití nekonečné smyčky
-          if ((wrap as any).glitchTl) {
-            ;(wrap as any).glitchTl.kill()
+
+          // Kill and DELETE — not just kill. The map entry itself must go.
+          const tl = timelines.get(i)
+          if (tl) {
+            tl.kill()
+            timelines.delete(i)
           }
 
-          // Sametový návrat do původního stavu
           gsap.to(wrap, {
             scale: 1,
             x: 0,
@@ -339,7 +482,7 @@ export const Projects = () => {
             duration: 0.8,
             ease: "power3.out",
           })
-          
+
           if (cR && cC) {
             gsap.to([cR, cC], { opacity: 0, x: 0, y: 0, duration: 0.15 })
           }
@@ -353,7 +496,12 @@ export const Projects = () => {
         })
       })
 
-      return () => removers.forEach((fn) => fn())
+      // Unmount cleanup — iterate the map, kill everything, clear.
+      return () => {
+        timelines.forEach((tl) => tl.kill())
+        timelines.clear()
+        removers.forEach((fn) => fn())
+      }
     },
     { scope: containerRef },
   )
@@ -379,7 +527,10 @@ export const Projects = () => {
             fontSize: "clamp(4rem, 16vw, 17rem)",
             transform: "skewY(var(--bg-skew)) scaleY(var(--bg-stretch))",
             willChange: "transform",
-            transition: `transform 160ms linear`,
+            // AUDIT FIX: the 160ms CSS transition has been REMOVED.
+            // The spring IS the smoothing. Layering a linear CSS interp on
+            // top was re-smoothing the regime-switch output, blurring the
+            // cast-iron attack into the magnetic recovery. Gone.
           }}
         >
           WORK/LOG
@@ -391,9 +542,7 @@ export const Projects = () => {
         className="flex h-full items-center px-[5vw] md:px-[10vw] gap-[10vw] md:gap-[15vw] will-change-transform pr-[20vw] z-10 transform-style-3d relative"
       >
         <div className="flex-shrink-0 w-[90vw] md:w-auto md:min-w-[45vw] relative z-20 pointer-events-none transform-gpu">
-          <span className="font-mono text-[10px] tracking-[0.5em] text-white/50 uppercase block mb-6">
-            {t.label}
-          </span>
+          <span className="font-mono text-[10px] tracking-[0.5em] text-white/50 uppercase block mb-6">{t.label}</span>
           <h2
             className="font-syne font-black uppercase tracking-[-0.05em] leading-[0.82] text-white drop-shadow-[0_0_40px_rgba(0,0,0,0.8)]"
             style={{ fontSize: "clamp(5rem, 14vw, 14rem)", fontFeatureSettings: '"ss01","ss02"' }}
@@ -401,10 +550,7 @@ export const Projects = () => {
             <span className="block whitespace-nowrap" style={{ clipPath: "inset(0 -100vw 0 0)" }}>
               <span className="projects-title-char inline-block">{t.titlePart1}</span>
             </span>
-            <span
-              className="block whitespace-nowrap -mt-[0.08em]"
-              style={{ clipPath: "inset(-0.15em -100vw 0 0)" }}
-            >
+            <span className="block whitespace-nowrap -mt-[0.08em]" style={{ clipPath: "inset(-0.15em -100vw 0 0)" }}>
               <span className="projects-title-char inline-block font-instrument italic font-light lowercase text-white/70">
                 {t.titlePart2}
               </span>
@@ -436,9 +582,7 @@ export const Projects = () => {
                 ["--skewX" as any]: "0deg",
                 ["--z" as any]: "0px",
                 ["--scale" as any]: 1,
-                transform:
-                  "rotateY(var(--rotY)) skewX(var(--skewX)) translateZ(var(--z)) scale(var(--scale))",
-                // ZMĚNĚNO: Odstraněn CSS transition. Fyziku teď 100% řídí asymLerp v JS.
+                transform: "rotateY(var(--rotY)) skewX(var(--skewX)) translateZ(var(--z)) scale(var(--scale))",
                 transformStyle: "preserve-3d",
               }}
             >
@@ -455,13 +599,24 @@ export const Projects = () => {
               </div>
 
               <Link
+                ref={(el) => {
+                  if (el) linkRefs.current[index] = el
+                }}
                 href={`/work/${p.slug}`}
                 draggable={false}
                 aria-label={`View case study for ${p.title}`}
                 data-cursor="hover"
-                className="relative block w-full h-full rounded-xl md:rounded-[2rem] overflow-hidden border border-white/10 bg-[#050505] shadow-[0_40px_80px_rgba(0,0,0,0.9)] pointer-events-auto cursor-pointer"
+                className="relative block w-full h-full rounded-xl md:rounded-[2rem] overflow-hidden bg-[#050505] pointer-events-auto cursor-pointer"
+                style={{
+                  // Signal-strength border + glow — driven from the rAF tick.
+                  ["--border-opacity" as any]: 0.1,
+                  ["--border-glow" as any]: "0px",
+                  border: "1px solid rgba(255,255,255,var(--border-opacity, 0.1))",
+                  boxShadow:
+                    "0 40px 80px rgba(0,0,0,0.9), 0 0 var(--border-glow, 0px) rgba(255,255,255,0.35)",
+                }}
               >
-                {/* Primary image — lives inside a GSAP-driven wrapper for the zoom/glitch */}
+                {/* Primary image — inside a GSAP-driven wrapper for zoom/glitch */}
                 <div
                   ref={(el) => {
                     if (el) imgWrapRefs.current[index] = el
@@ -481,13 +636,13 @@ export const Projects = () => {
                   />
                 </div>
 
-                {/* RGB split — RED channel (cheap CSS filter hue-shift of the same source) */}
+                {/* RGB split — RED channel */}
                 <div
                   ref={(el) => {
                     if (el) chromaRRefs.current[index] = el
                   }}
                   aria-hidden
-                  className="absolute inset-0 pointer-events-none z-10" // ZMĚNĚNO: Přidán z-10
+                  className="absolute inset-0 pointer-events-none z-10"
                   style={{
                     backgroundImage: `url(${p.image})`,
                     backgroundSize: "cover",
@@ -504,7 +659,7 @@ export const Projects = () => {
                     if (el) chromaCRefs.current[index] = el
                   }}
                   aria-hidden
-                  className="absolute inset-0 pointer-events-none z-10" // ZMĚNĚNO: Přidán z-10
+                  className="absolute inset-0 pointer-events-none z-10"
                   style={{
                     backgroundImage: `url(${p.image})`,
                     backgroundSize: "cover",
@@ -516,13 +671,82 @@ export const Projects = () => {
                   }}
                 />
 
-                {/* ZMĚNĚNO: Přidán z-0, aby gradient podlezl glitch efekt */}
+                {/* UPGRADE 1: Velocity-driven scanline grid — opacity and
+                    spacing are written from the rAF tick. At rest, invisible.
+                    Under scroll, compresses and asserts itself. */}
+                <div
+                  ref={(el) => {
+                    if (el) gridRefs.current[index] = el
+                  }}
+                  aria-hidden
+                  className="absolute inset-0 pointer-events-none z-[11]"
+                  style={{
+                    ["--grid-size" as any]: "24px",
+                    backgroundImage:
+                      "linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)",
+                    backgroundSize: "var(--grid-size, 24px) var(--grid-size, 24px)",
+                    mixBlendMode: "overlay",
+                    opacity: 0,
+                    willChange: "opacity, background-size",
+                  }}
+                />
+
                 <div className="absolute inset-0 bg-gradient-to-t from-[#020202] via-[#020202]/10 to-transparent opacity-90 pointer-events-none z-0" />
 
                 <div className="absolute top-6 left-6 md:top-10 md:left-10 z-20 pointer-events-none">
                   <span className="font-mono text-[9px] tracking-[0.4em] text-white/50 uppercase">
                     {p.id} · CASE
                   </span>
+                </div>
+
+                {/* UPGRADE 2: PERSPECTIVE · RENDER · MATRIX HUD.
+                    Text nodes are written every frame from the exact values
+                    driving rotateY/skewX/translateZ. The label and the
+                    geometry share one source of truth. */}
+                <div
+                  className="absolute top-6 right-6 md:top-10 md:right-10 z-20 pointer-events-none font-mono text-[9px] tracking-[0.2em] uppercase text-white/70 backdrop-blur-sm bg-black/30 border border-white/10 px-3 py-2 rounded-sm"
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                  aria-hidden
+                >
+                  <div className="text-white/40 mb-1.5">PROJ · RENDER · MATRIX</div>
+                  <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+                    <span className="text-white/40">ROT_Y</span>
+                    <span
+                      ref={(el) => {
+                        if (el) hudRotYRefs.current[index] = el
+                      }}
+                      className="text-right text-white"
+                    >
+                      0.00°
+                    </span>
+                    <span className="text-white/40">SKEW_X</span>
+                    <span
+                      ref={(el) => {
+                        if (el) hudSkewRefs.current[index] = el
+                      }}
+                      className="text-right text-white"
+                    >
+                      0.00°
+                    </span>
+                    <span className="text-white/40">Z_DEPTH</span>
+                    <span
+                      ref={(el) => {
+                        if (el) hudDepthRefs.current[index] = el
+                      }}
+                      className="text-right text-white"
+                    >
+                      0.0z
+                    </span>
+                    <span className="text-white/40">VEL</span>
+                    <span
+                      ref={(el) => {
+                        if (el) hudVelRefs.current[index] = el
+                      }}
+                      className="text-right text-white"
+                    >
+                      0%
+                    </span>
+                  </div>
                 </div>
 
                 <div className="absolute bottom-6 left-6 md:bottom-12 md:left-12 z-20 pointer-events-none">

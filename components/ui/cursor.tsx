@@ -29,11 +29,19 @@ import { useEffect, useRef, useState } from "react"
 // render (postprocessing touches `window` at module init).
 import { cursorBus } from "@/lib/cursor-bus"
 
-// 60Hz baseline values. Effective lerp = 1 - (1 - baseLerp)^refreshScale
-// where refreshScale = 60 / actualHz. This guarantees identical perceptual
-// motion on 60Hz and 120Hz displays.
-const MAIN_LERP_60  = 0.32   // audit spec — "cursor should feel tethered"
-const TRAIL_LERP_60 = 0.15   // outer ring trails slightly behind main dot
+// ─── EXPONENTIAL DECAY (analytically frame-rate independent) ───────────────
+// `lerp(a, b, k)` is per-frame-percentage and therefore TWICE as aggressive
+// at 120Hz as at 60Hz. The correct formulation for a critically-damped
+// follow is `x += (target - x) * (1 - exp(-λ·dt))` where λ is a time
+// constant in continuous time. At λ = 23, the cursor converges 63% every
+// 43ms regardless of whether rAF fires at 60Hz, 120Hz, or 144Hz.
+//
+// Calibration: at 60Hz (dt ≈ 16.67ms) this matches a legacy per-frame
+// lerp of ~0.32 for the main dot and ~0.15 for the trailing ring — the
+// same perceptual feel the audit spec requires, but now PROVABLY correct
+// at any refresh rate.
+const LAMBDA_MAIN  = 23   // 1/s — main dot
+const LAMBDA_TRAIL = 10   // 1/s — outer ring trails slightly behind
 
 export const Cursor = () => {
   const [mounted, setMounted] = useState(false)
@@ -75,38 +83,23 @@ export const Cursor = () => {
     let rafId   = 0
     let lastT   = performance.now()
 
-    // Refresh-rate detection — rolling average of rAF deltas. Detected
-    // within the first ~8 frames then locked for the remainder of the
-    // session. 60Hz → 16.67ms, 120Hz → 8.33ms, 144Hz → 6.94ms.
-    const deltas: number[] = []
-    let refreshHz = 60
-    let refreshScale = 1.0
-
     const render = (now: number) => {
-      const dt = now - lastT
+      // dt in SECONDS — the time constant λ is 1/seconds, so convergence
+      // depends on wall-clock time, not on how many times rAF has fired.
+      // Clamp the top end so a dropped frame can't teleport the cursor.
+      const dt = Math.min((now - lastT) / 1000, 0.05)
       lastT = now
 
-      // Sample the first 16 frames to classify refresh rate
-      if (deltas.length < 16) {
-        deltas.push(dt)
-        if (deltas.length === 16) {
-          const avg = deltas.reduce((a, b) => a + b, 0) / deltas.length
-          refreshHz = avg < 10 ? 144 : avg < 13 ? 120 : 60
-          refreshScale = 60 / refreshHz
-        }
-      }
+      // 1 - exp(-λ·dt) is the closed-form solution to the continuous
+      // differential equation dx/dt = -λ·(x - target). Identical
+      // perceptual motion at 60Hz, 120Hz, 144Hz.
+      const mainDecay  = 1 - Math.exp(-LAMBDA_MAIN  * dt)
+      const trailDecay = 1 - Math.exp(-LAMBDA_TRAIL * dt)
 
-      // Normalize lerp: on 120Hz we use a LARGER per-frame coefficient
-      // because there are more frames per second. This keeps the
-      // perceptual "catch-up time" constant across refresh rates.
-      // Formula: 1 - (1 - baseLerp)^refreshScale
-      const mainLerp  = 1 - Math.pow(1 - MAIN_LERP_60,  refreshScale)
-      const trailLerp = 1 - Math.pow(1 - TRAIL_LERP_60, refreshScale)
-
-      mainX  += (targetX - mainX)  * mainLerp
-      mainY  += (targetY - mainY)  * mainLerp
-      trailX += (targetX - trailX) * trailLerp
-      trailY += (targetY - trailY) * trailLerp
+      mainX  += (targetX - mainX)  * mainDecay
+      mainY  += (targetY - mainY)  * mainDecay
+      trailX += (targetX - trailX) * trailDecay
+      trailY += (targetY - trailY) * trailDecay
 
       root.style.transform = `translate3d(${mainX}px, ${mainY}px, 0)`
 
