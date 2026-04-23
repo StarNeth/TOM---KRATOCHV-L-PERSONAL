@@ -382,25 +382,20 @@ export const Preloader = () => {
     if (completedRef.current) return
     completedRef.current = true
 
-    // ── MOBILE DETECTION for poll timeout ──────────────────────────────
-    // REGRESSION 01 TERTIARY: iOS Safari can take 800–1200ms to compile
-    // the fragment shader on first load. 500ms expires before compilation
-    // completes, dismissing the preloader over an unrendered scene.
-    // On mobile, extend to 2500ms. `navigator.maxTouchPoints > 0`
-    // catches iOS — userAgent is unreliable on iPadOS (reports desktop
-    // Safari). An Android userAgent regex is kept as a belt-and-braces
-    // check in case a phone lies about touch points.
+    // ── NULL GUARD — DOM may have been torn down before this fires ──────
+    if (!stageRef.current || !shardContainerRef.current) {
+      setDone(true)
+      return
+    }
+
     const isMobileDevice =
-      (typeof navigator !== "undefined" &&
-        navigator.maxTouchPoints > 0 &&
-        window.innerWidth < 1024) ||
-      /Android/i.test(navigator?.userAgent ?? "")
+      typeof navigator !== "undefined" &&
+      ((navigator.maxTouchPoints > 0 && window.innerWidth < 1024) ||
+        /Android/i.test(navigator.userAgent ?? ""))
     const WEBGL_POLL_TIMEOUT = isMobileDevice ? 2500 : 500
 
     let webglReady = false
-    const onWebGLFirstFrame = () => {
-      webglReady = true
-    }
+    const onWebGLFirstFrame = () => { webglReady = true }
     window.addEventListener("webgl-first-frame", onWebGLFirstFrame, { once: true })
 
     const commitFinish = () => {
@@ -411,10 +406,7 @@ export const Preloader = () => {
       tlRef.current = null
     }
     const finish = () => {
-      if (webglReady) {
-        commitFinish()
-        return
-      }
+      if (webglReady) { commitFinish(); return }
       const start = performance.now()
       const poll = () => {
         if (webglReady || performance.now() - start > WEBGL_POLL_TIMEOUT) {
@@ -440,222 +432,171 @@ export const Preloader = () => {
       return
     }
 
+    // ── PORTRAIT-AWARE PIXEL GEOMETRY ────────────────────────────────────
     const vw = window.innerWidth
-    const fs = Math.min(Math.max(vw * 0.32, 160), 448)
-    const CHAR_H = fs * 0.76
+    const isPortrait = window.innerHeight > vw
+
+    const portraitFactor = isPortrait ? 0.8 : 1.0
+    const fs = Math.min(Math.max(vw * 0.32, 160), 448) * portraitFactor
+    const CHAR_H   = fs * 0.76
     const T_CHAR_W = fs * 0.56
     const K_CHAR_W = fs * 0.64
-    const CLUSTER = vw * 0.14
 
-    const shardEls = Array.from(shardContainerRef.current?.querySelectorAll(".pp-shard") ?? []) as HTMLDivElement[]
+    const T_HALF = T_CHAR_W * 0.52 
+    const K_HALF = K_CHAR_W * 0.58
+    const MIN_CLUSTER = T_HALF + K_HALF + 8 
+    const CLUSTER = Math.max(vw * 0.14, MIN_CLUSTER * 0.5)
 
-    const tParts = particles.filter((p) => p.isT)
-    const kParts = particles.filter((p) => !p.isT)
+    const POS_ENTER = CLUSTER            
+    const POS_DRIFT = CLUSTER + vw * 0.04   
+    const POS_COLLIDE = T_HALF + K_HALF + 1
+
+    const shardEls = Array.from(
+      shardContainerRef.current?.querySelectorAll(".pp-shard") ?? []
+    ) as HTMLDivElement[]
+
+    if (shardEls.length === 0) { finish(); return }
+
+    const tParts  = particles.filter((p) => p.isT)
+    const kParts  = particles.filter((p) => !p.isT)
     const tShards = shardEls.filter((_, i) => particles[i]?.isT)
     const kShards = shardEls.filter((_, i) => !particles[i]?.isT)
 
-    const digits = [digit0Ref, digit1Ref, digit2Ref].map((r) => r.current).filter(Boolean) as HTMLSpanElement[]
+    const digits = [digit0Ref, digit1Ref, digit2Ref]
+      .map((r) => r.current).filter(Boolean) as HTMLSpanElement[]
 
     const tl = gsap.timeline({ onComplete: finish })
     tlRef.current = tl
 
-    // ── ACT I TAIL — OVERLOAD VIBRATION ────────────────────────────────
+    // ── ACT I TAIL — OVERLOAD VIBRATION ──────────────────────────────────
     tl.to({}, { duration: 0.15 })
     ;[0.6, 1.0, 1.5, 2.0].forEach((amp) => {
-      tl.to(
-        digits,
-        {
-          keyframes: [
-            { x: 4.5 * amp, duration: 0.028 },
-            { x: -4.5 * amp, duration: 0.028 },
-            { x: 3.5 * amp, duration: 0.022 },
-            { x: -3.5 * amp, duration: 0.022 },
-            { x: 1.5 * amp, duration: 0.018 },
-            { x: 0, duration: 0.015 },
-          ],
-          stagger: 0.008 + amp * 0.005,
-          ease: "none",
-        },
-        ">-0.01",
-      )
+      tl.to(digits, {
+        keyframes: [
+          { x:  4.5 * amp, duration: 0.028 },
+          { x: -4.5 * amp, duration: 0.028 },
+          { x:  3.5 * amp, duration: 0.022 },
+          { x: -3.5 * amp, duration: 0.022 },
+          { x:  1.5 * amp, duration: 0.018 },
+          { x:  0,         duration: 0.015 },
+        ],
+        stagger: 0.008 + amp * 0.005,
+        ease: "none",
+      }, ">-0.01")
     })
 
-    tl.to(
-      digits,
-      {
-        scale: 1.18,
-        filter: "brightness(8) blur(10px)",
-        opacity: 0,
-        duration: 0.38,
-        stagger: 0.07,
-        ease: "power2.in",
-      },
-      ">-0.04",
-    )
+    tl.to(digits, {
+      scale: 1.18,
+      filter: "brightness(8) blur(10px)",
+      opacity: 0,
+      duration: 0.38,
+      stagger: 0.07,
+      ease: "power2.in",
+    }, ">-0.04")
 
     tl.set(digits, { display: "none" })
     tl.set(counterRef.current, { display: "none" })
-
     tl.to(
-      [topRuleRef.current, botRuleRef.current, labelRef.current],
-      {
-        opacity: 0,
-        y: (i: number) => (i === 0 ? -18 : 18),
-        duration: 0.3,
-        ease: "power2.in",
-      },
-      "<",
+      [topRuleRef.current, botRuleRef.current, labelRef.current].filter(Boolean),
+      { opacity: 0, y: (i: number) => (i === 0 ? -18 : 18), duration: 0.3, ease: "power2.in" },
+      "<"
     )
 
     // ── ACT II — BIG BANG ──────────────────────────────────────────────
+    const maxExplode = isPortrait ? Math.min(vw * 0.8, 280) : Infinity
     tl.set(shardEls, { opacity: 1, x: 0, y: 0, rotation: 0, scale: 1 }, "<0.04")
-
-    tl.to(
-      shardEls,
-      {
-        x: (i) => Math.cos(particles[i]?.explodeAngle ?? 0) * (particles[i]?.explodeDist ?? 280),
-        y: (i) => Math.sin(particles[i]?.explodeAngle ?? 0) * (particles[i]?.explodeDist ?? 280),
-        rotation: (i) => particles[i]?.explodeRot ?? 0,
-        opacity: (i) => 0.3 + sr(i * 3.13) * 0.7,
-        duration: 0.55,
-        ease: "expo.out",
-        stagger: { amount: 0.06, from: "center" },
+    tl.to(shardEls, {
+      x: (i) => {
+        const raw = Math.cos(particles[i]?.explodeAngle ?? 0) * (particles[i]?.explodeDist ?? 280)
+        return isPortrait ? Math.max(-maxExplode, Math.min(maxExplode, raw)) : raw
       },
-      ">-0.12",
-    )
-
-    // ── ACT III — TRUE POISSON PULL ────────────────────────────────────
-    // `cumArrival` is the cluster-local cumulative inter-arrival time,
-    // scaled to the 650ms window. Particles therefore arrive in bursts
-    // followed by silences — some land three-in-a-row within 40ms, then
-    // a 180ms gap, then five more. That is the arrival statistic of a
-    // Poisson process. Per-particle durations remain slightly jittered
-    // so arrival times do not share a common back-edge either.
-    tl.to(
-      tShards,
-      {
-        x: (li) => -CLUSTER + (tParts[li]?.nx ?? 0) * T_CHAR_W,
-        y: (li) => (tParts[li]?.ny ?? 0) * CHAR_H,
-        rotation: 0,
-        scale: 0.45,
-        opacity: (li) => 0.55 + sr(li * 7.71) * 0.45,
-        duration: (li) => 0.58 + (tParts[li]?.settleDelta ?? 0.075) * 1.2,
-        ease: "expo.in",
-        // CUMULATIVE arrival — NOT per-element inter-arrival. This is the
-        // entire Poisson correction in one line.
-        stagger: (li) => tParts[li]?.cumArrival ?? 0,
+      y: (i) => {
+        const raw = Math.sin(particles[i]?.explodeAngle ?? 0) * (particles[i]?.explodeDist ?? 280)
+        return isPortrait ? Math.max(-maxExplode, Math.min(maxExplode, raw)) : raw
       },
-      "+=0.04",
-    )
+      rotation: (i) => particles[i]?.explodeRot ?? 0,
+      opacity:  (i) => 0.3 + sr(i * 3.13) * 0.7,
+      duration: 0.55,
+      ease: "expo.out",
+      stagger: { amount: 0.06, from: "center" },
+    }, ">-0.12")
 
-    tl.to(
-      kShards,
-      {
-        x: (li) => CLUSTER + (kParts[li]?.nx ?? 0) * K_CHAR_W,
-        y: (li) => (kParts[li]?.ny ?? 0) * CHAR_H,
-        rotation: 0,
-        scale: 0.45,
-        opacity: (li) => 0.55 + sr(li * 8.87) * 0.45,
-        duration: (li) => 0.58 + (kParts[li]?.settleDelta ?? 0.075) * 1.2,
-        ease: "expo.in",
-        stagger: (li) => kParts[li]?.cumArrival ?? 0,
-      },
-      "<",
-    )
+    // ── ACT III — TRUE POISSON PULL ───────────────────────────────────
+    tl.to(tShards, {
+      x:        (li) => -CLUSTER + (tParts[li]?.nx ?? 0) * T_CHAR_W,
+      y:        (li) =>             (tParts[li]?.ny ?? 0) * CHAR_H,
+      rotation: 0,
+      scale:    0.45,
+      opacity:  (li) => 0.55 + sr(li * 7.71) * 0.45,
+      duration: (li) => 0.58 + (tParts[li]?.settleDelta ?? 0.075) * 1.2,
+      ease:     "expo.in",
+      stagger:  (li) => tParts[li]?.cumArrival ?? 0,
+    }, "+=0.04")
+    tl.to(kShards, {
+      x:        (li) =>  CLUSTER + (kParts[li]?.nx ?? 0) * K_CHAR_W,
+      y:        (li) =>             (kParts[li]?.ny ?? 0) * CHAR_H,
+      rotation: 0,
+      scale:    0.45,
+      opacity:  (li) => 0.55 + sr(li * 8.87) * 0.45,
+      duration: (li) => 0.58 + (kParts[li]?.settleDelta ?? 0.075) * 1.2,
+      ease:     "expo.in",
+      stagger:  (li) => kParts[li]?.cumArrival ?? 0,
+    }, "<")
 
     tl.to({}, { duration: 0.1 })
 
-    // ── ACT IV — MATERIALIZATION ───────────────────────────────────────
-    tl.fromTo(
-      letterTRef.current,
-      { x: "-14vw", scale: 0.88, opacity: 0, filter: "brightness(12) blur(24px)" },
-      { x: "-14vw", scale: 1, opacity: 1, filter: "brightness(1) blur(0px)", duration: 0.75, ease: "expo.out" },
-      ">-0.08",
+    // ── ACT IV — MATERIALIZATION (pixel positions) ─────────────────────
+    tl.fromTo(letterTRef.current,
+      { x: -POS_ENTER, scale: 0.88, opacity: 0, filter: "brightness(12) blur(24px)" },
+      { x: -POS_ENTER, scale: 1,    opacity: 1, filter: "brightness(1) blur(0px)",
+        duration: 0.75, ease: "expo.out" },
+      ">-0.08"
     )
-    tl.fromTo(
-      letterKRef.current,
-      { x: "14vw", scale: 0.88, opacity: 0, filter: "brightness(12) blur(24px)" },
-      { x: "14vw", scale: 1, opacity: 1, filter: "brightness(1) blur(0px)", duration: 0.75, ease: "expo.out" },
-      "<",
+    tl.fromTo(letterKRef.current,
+      { x:  POS_ENTER, scale: 0.88, opacity: 0, filter: "brightness(12) blur(24px)" },
+      { x:  POS_ENTER, scale: 1,    opacity: 1, filter: "brightness(1) blur(0px)",
+        duration: 0.75, ease: "expo.out" },
+      "<"
     )
+    tl.to(shardEls, {
+      opacity: 0, scale: 0,
+      duration: (i) => 0.26 + (particles[i]?.dissolveJitter ?? 0.07),
+      ease: "power2.out",
+      stagger: (i) => particles[i]?.dissolveJitter ?? 0.07,
+    }, "<0.18")
 
-    tl.to(
-      shardEls,
-      {
-        opacity: 0,
-        scale: 0,
-        duration: (i) => 0.26 + (particles[i]?.dissolveJitter ?? 0.07),
-        ease: "power2.out",
-        stagger: (i) => particles[i]?.dissolveJitter ?? 0.07,
-      },
-      "<0.18",
-    )
+    // ── ACT V — CINEMATIC DRIFT (pixel) ────────────────────────────────
+    tl.to(letterTRef.current, { x: -POS_DRIFT, duration: 1.8, ease: "power1.inOut" }, "+=0.05")
+    tl.to(letterKRef.current, { x:  POS_DRIFT, duration: 1.8, ease: "power1.inOut" }, "<")
 
-    // ── ACT V — CINEMATIC DRIFT ────────────────────────────────────────
-    tl.to(letterTRef.current, { x: "-18vw", duration: 1.8, ease: "power1.inOut" }, "+=0.05")
-    tl.to(letterKRef.current, { x: "18vw", duration: 1.8, ease: "power1.inOut" }, "<")
-
-    // ── ACT VI — CRITICAL MASS ─────────────────────────────────────────
+    // ── ACT VI — CRITICAL MASS (pixel — zero overlap guaranteed) ───────
     tl.to([letterTRef.current, letterKRef.current], {
-      x: (i: number) => (i === 0 ? "-15.5vw" : "15.5vw"),
+      x: (idx: number) => idx === 0 ? -POS_COLLIDE : POS_COLLIDE,
       duration: 0.14,
       ease: "power4.in",
     })
-      .to([letterTRef.current, letterKRef.current], {
-        scale: 1.06,
-        duration: 0.05,
-        ease: "none",
-      })
-      .to(
-        stageRef.current,
-        {
-          backgroundColor: "#ffffff",
-          duration: 0.05,
-          ease: "none",
-        },
-        "<",
-      )
+    .to([letterTRef.current, letterKRef.current], {
+      scale: 1.06, duration: 0.05, ease: "none",
+    })
+    .to(stageRef.current, {
+      backgroundColor: "#ffffff", duration: 0.05, ease: "none",
+    }, "<")
 
-      // ── ACT VII — PORTAL SCALE ────────────────────────────────────────
-      .to(
-        [letterTRef.current, letterKRef.current],
-        {
-          scale: 100,
-          opacity: 0,
-          filter: "blur(40px)",
-          duration: 0.85,
-          ease: "expo.out",
-        },
-        "+=0.03",
-      )
-
-      .to(
-        stageRef.current,
-        {
-          opacity: 0,
-          duration: 0.8,
-          ease: "power2.out",
-        },
-        "<",
-      )
-
-      .to(
-        rootRef.current,
-        {
-          autoAlpha: 0,
-          duration: 0.1,
-          ease: "none",
-          onComplete: () => {
-            if (rootRef.current) rootRef.current.style.display = "none"
-          },
-        },
-        "-=0.18",
-      )
+    // ── ACT VII — PORTAL SCALE ─────────────────────────────────────────
+    .to([letterTRef.current, letterKRef.current], {
+      scale: 100, opacity: 0, filter: "blur(40px)",
+      duration: 0.85, ease: "expo.out",
+    }, "+=0.03")
+    .to(stageRef.current, { opacity: 0, duration: 0.80, ease: "power2.out" }, "<")
+    .to(rootRef.current, {
+      autoAlpha: 0, duration: 0.10, ease: "none",
+      onComplete: () => { if (rootRef.current) rootRef.current.style.display = "none" },
+    }, "-=0.18")
   }, [announce, particles])
 
   useEffect(() => {
-    if (letterTRef.current) gsap.set(letterTRef.current, { opacity: 0, x: "-14vw", scale: 0.88 })
-    if (letterKRef.current) gsap.set(letterKRef.current, { opacity: 0, x: "14vw", scale: 0.88 })
+    if (letterTRef.current) gsap.set(letterTRef.current, { opacity: 0, x: 0, scale: 0.88 })
+    if (letterKRef.current) gsap.set(letterKRef.current, { opacity: 0, x: 0, scale: 0.88 })
     const shards = shardContainerRef.current?.querySelectorAll(".pp-shard")
     if (shards) gsap.set(shards, { opacity: 0, x: 0, y: 0, rotation: 0, scale: 1 })
   }, [])

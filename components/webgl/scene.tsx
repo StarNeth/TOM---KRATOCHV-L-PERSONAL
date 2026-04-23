@@ -349,28 +349,24 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       float h, float ridge, vec3 floorCol, vec3 peakCol,
       vec3 N, float ao
     ) {
-      // 1. Body — crushed height → vast dark floor, gentle mid-tone rise
-      //    REGRESSION 03 FIX: pow(h, 5.0) calibrated for 4-octave FBM ceiling.
-      //    On mobile (3-octave, ceiling ~0.82), pow(h, 2.6) preserves the
-      //    same color spread across the lower practical range.
+      // 1. Body — crushed height → vast dark floor
       #if IS_MOBILE == 1
-      float crushed = pow(h, 2.6);
+      float crushed = pow(h, 4.2);
       #else
       float crushed = pow(h, 5.0);
       #endif
       vec3 body = mix(floorCol, peakCol, crushed * 0.35);
 
-      // 2. Ridge energy (the "ferrofluid spike" bloom target)
+      // 2. Ridge energy — PRIMARY over-exposure vector.
+      #if IS_MOBILE == 1
+      float ridgeEnergy = 0.72 + uIntensity * 0.35;
+      #else
       float ridgeEnergy = 1.6 + uIntensity * 1.4;
+      #endif
       vec3 ridgeEmit = peakCol * ridge * ridgeEnergy;
 
-      // 3. GGX specular — light direction parallax-shifts with cursor,
-      //    adding a second light that tracks the mouse for depth cues.
-      //    REGRESSION 03 FIX: on mobile, uMouse/uCursor never update, so
-      //    L collapses to (0,0,1) → zero angular variance → near-zero
-      //    specular everywhere. A slow synthetic drift gives the surface
-      //    the "light across liquid" motion. Cost: 2 trig ops per pixel.
-      vec3 V = vec3(0.0, 0.0, 1.0);                               // fixed viewer
+      // 3. GGX specular — synthetic light drift on mobile (unchanged, correct)
+      vec3 V = vec3(0.0, 0.0, 1.0);
       #if IS_MOBILE == 1
       vec3 L = normalize(vec3(
         sin(uTime * 0.12) * 0.28,
@@ -378,7 +374,7 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
         1.3
       ));
       #else
-      vec3 L = normalize(vec3(uMouse * 0.6 + uCursor * 0.4, 1.3));// parallax light
+      vec3 L = normalize(vec3(uMouse * 0.6 + uCursor * 0.4, 1.3));
       #endif
       vec3 H = normalize(L + V);
       float NdotL = max(dot(N, L), 0.0);
@@ -386,34 +382,25 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       float NdotH = max(dot(N, H), 0.0);
       float VdotH = max(dot(V, H), 0.0);
 
-      // Obsidian F0 ≈ dielectric; ramps toward chromium-metal at peak
       vec3 F0 = mix(vec3(0.035), peakCol * 0.75, ridge * 0.9);
-      float roughness = mix(0.38, 0.12, ridge); // crests are glossier
+      float roughness = mix(0.38, 0.12, ridge);
 
       float D = D_GGX(NdotH, roughness);
       float G = G_Smith(NdotV, NdotL, roughness);
       vec3  F = F_Schlick(F0, VdotH);
       vec3 specular = (D * G) * F / max(4.0 * NdotV * NdotL, 1e-3);
 
-      // 4. Apply AO only to the diffuse/body contribution — peaks glow freely.
       vec3 lit = body * ao + specular * NdotL * 1.35 + ridgeEmit;
 
-      // ── REGRESSION 03 FIX — synthetic iridescence + AO cool tint ────
-      // Compensates for the absent CA postprocessing pass and the missing
-      // shader-side CA block on mobile. Slowly-shifting hue mapped from
-      // surface height → chromatic obsidian shimmer. Ridge-gated, so the
-      // floor remains dark and credible. ~4 arithmetic ops per pixel,
-      // zero extra noise samples.
+      // 4. Iridescent ambient — RECALIBRATED.
       #if IS_MOBILE == 1
-      float iridHue  = fract(h * 0.32 + uTime * 0.007);
-      vec3  iridescent = 0.5 + 0.5 * cos(6.28318 * (iridHue + vec3(0.00, 0.33, 0.67)));
-      lit += iridescent * 0.09 * ridge;
-      // Secondary: subtle AO-gated ambient prevents the floor from reading
-      // as uniform black. Deep valleys get a faint cool tint — perceptual depth.
-      lit += vec3(0.008, 0.010, 0.018) * (1.0 - ao) * 0.6;
+      float iridHue = fract(h * 0.32 + uTime * 0.007);
+      vec3 iridescent = 0.5 + 0.5 * cos(6.28318 * (iridHue + vec3(0.00, 0.33, 0.67)));
+      float iridGate = clamp((ridge - 0.55) / 0.45, 0.0, 1.0);
+      lit += iridescent * 0.035 * iridGate;
+      lit += vec3(0.004, 0.005, 0.009) * (1.0 - ao) * 0.3;
       #endif
 
-      // 5. Reader protection at end of scroll
       float dimming = mix(1.0, 0.4, smoothstep(0.85, 1.0, uScrollProgress));
       return lit * dimming;
     }

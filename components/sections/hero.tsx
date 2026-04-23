@@ -225,8 +225,11 @@ export const Hero = () => {
           <span className="block overflow-hidden w-full">
             <span
               ref={firstRowRef}
-              className="block text-[clamp(3.8rem,19vw,22rem)] whitespace-nowrap"
-              style={{ marginLeft: "-0.04em" }}
+              className="block whitespace-nowrap"
+              style={{
+                fontSize: "clamp(3.2rem, 15vw, 22rem)",
+                marginLeft: "-0.04em",
+              }}
             >
               TOMÁŠ
             </span>
@@ -234,10 +237,12 @@ export const Hero = () => {
           <span className="block overflow-hidden w-full -mt-[0.06em]">
             <span
               ref={secondRowRef}
-              className="block text-[clamp(2.5rem,13.5vw,15rem)] whitespace-nowrap"
+              className="block"
               style={{
+                fontSize: "clamp(2.2rem, 10.5vw, 15rem)",
                 color: "rgba(255,255,255,0.94)",
-                marginRight: "-0.06em",
+                marginRight: "-0.04em",
+                whiteSpace: "nowrap",
               }}
             >
               KRATOCHVÍL
