@@ -38,6 +38,21 @@
  *
  * STRUCTURAL: the 160ms CSS transition that was fighting the spring in
  * `projects.tsx` has been removed over there. This file was clean.
+ *
+ * ═══════════════════════════════════════════════════════════════════
+ * DIRECTOR'S SURGICAL PATCH — REGRESSION 01 TERTIARY (poll timeout)
+ * ═══════════════════════════════════════════════════════════════════
+ * The `webgl-first-frame` poll window was hardcoded at 500ms. On an
+ * A13 Bionic compiling the fragment shader for the first time, 500ms
+ * is insufficient — shader compilation alone can take 800–1200ms on
+ * first load. The poll expired, `commitFinish()` fired, and the user
+ * got the hero with a still-compiling shader underneath.
+ *
+ * FIX: detect mobile (via `navigator.maxTouchPoints > 0 && innerWidth
+ * < 1024`, with an Android userAgent fallback — userAgent alone is
+ * unreliable on iPadOS) and extend the poll timeout to 2500ms there.
+ * Desktop retains the 500ms timeout — no desktop regression.
+ * ═══════════════════════════════════════════════════════════════════
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
@@ -362,10 +377,25 @@ export const Preloader = () => {
 
   // ═════════════════════════════════════════════════════════════════════════
   // THE NUCLEAR TIMELINE
-  // ══════════════���══════════════════════════════════════════════════════════
+  // ═════════════════════════════════════════════════════════════════════════
   const triggerExit = useCallback(() => {
     if (completedRef.current) return
     completedRef.current = true
+
+    // ── MOBILE DETECTION for poll timeout ──────────────────────────────
+    // REGRESSION 01 TERTIARY: iOS Safari can take 800–1200ms to compile
+    // the fragment shader on first load. 500ms expires before compilation
+    // completes, dismissing the preloader over an unrendered scene.
+    // On mobile, extend to 2500ms. `navigator.maxTouchPoints > 0`
+    // catches iOS — userAgent is unreliable on iPadOS (reports desktop
+    // Safari). An Android userAgent regex is kept as a belt-and-braces
+    // check in case a phone lies about touch points.
+    const isMobileDevice =
+      (typeof navigator !== "undefined" &&
+        navigator.maxTouchPoints > 0 &&
+        window.innerWidth < 1024) ||
+      /Android/i.test(navigator?.userAgent ?? "")
+    const WEBGL_POLL_TIMEOUT = isMobileDevice ? 2500 : 500
 
     let webglReady = false
     const onWebGLFirstFrame = () => {
@@ -387,7 +417,7 @@ export const Preloader = () => {
       }
       const start = performance.now()
       const poll = () => {
-        if (webglReady || performance.now() - start > 500) {
+        if (webglReady || performance.now() - start > WEBGL_POLL_TIMEOUT) {
           window.removeEventListener("webgl-first-frame", onWebGLFirstFrame)
           commitFinish()
           return

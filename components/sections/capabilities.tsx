@@ -1,21 +1,6 @@
 // components/sections/capabilities.tsx
 "use client"
 
-/**
- * capabilities.tsx — Organic Singularity
- *
- * NEW: When a pill is clicked, the DOM reacts in sync with the WebGL
- * refractive shockwave. The pill text undergoes a "letter burst":
- *   1. letterSpacing explodes outward (0.1em → 0.55em)
- *   2. A subtle blur flash (blur(3px) → 0)
- *   3. The wrapper gets a micro scale-punch (0.82 → 1.04 → 1.0)
- *
- * The timing is calibrated so the DOM burst peaks at the same moment
- * the WebGL shockwave ring passes through the clicked pill's position
- * (~120ms after click), creating the illusion that the fluid and UI
- * are one living surface.
- */
-
 import { useRef, useState, useEffect } from "react"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
@@ -33,23 +18,23 @@ const DICTIONARY = {
 
 const skillsData = [
   { text: "SYSTEM ARCHITECTURE", type: "solid",   desk: { x: 15, y: 20 } },
-  { text: "NEXT.JS 16",          type: "outline",  desk: { x: 50, y: 15 } },
-  { text: "REACT 19",            type: "orange",   desk: { x: 80, y: 25 } },
-  { text: "WEBGL",               type: "circle",   desk: { x: 20, y: 50 } },
-  { text: "UI/UX",               type: "outline",  desk: { x: 85, y: 55 } },
-  { text: "PERFORMANCE",         type: "solid",    desk: { x: 15, y: 80 } },
-  { text: "3D EXPERIENCES",      type: "outline",  desk: { x: 50, y: 85 } },
-  { text: "GSAP",                type: "orange",   desk: { x: 80, y: 85 } },
+  { text: "NEXT.JS 16",          type: "outline", desk: { x: 50, y: 15 } },
+  { text: "REACT 19",            type: "orange",  desk: { x: 80, y: 25 } },
+  { text: "WEBGL",               type: "circle",  desk: { x: 20, y: 50 } },
+  { text: "UI/UX",               type: "outline", desk: { x: 85, y: 55 } },
+  { text: "PERFORMANCE",         type: "solid",   desk: { x: 15, y: 80 } },
+  { text: "3D EXPERIENCES",      type: "outline", desk: { x: 50, y: 85 } },
+  { text: "GSAP",                type: "orange",  desk: { x: 80, y: 85 } },
 ]
 
 export const Capabilities = () => {
   const { language } = useLanguage()
   const t = DICTIONARY[language as keyof typeof DICTIONARY]
-  const sectionRef    = useRef<HTMLElement>(null)
-  const containerRef  = useRef<HTMLDivElement>(null)
-  const nodesRef      = useRef<HTMLDivElement[]>([])
-  const magneticRefs  = useRef<HTMLDivElement[]>([])
-  const textSpanRefs  = useRef<HTMLSpanElement[]>([])
+  const sectionRef   = useRef<HTMLElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const nodesRef     = useRef<HTMLDivElement[]>([])
+  const magneticRefs = useRef<HTMLDivElement[]>([])
+  const textSpanRefs = useRef<HTMLSpanElement[]>([])
 
   const [isMounted, setIsMounted] = useState(false)
   const [isMobile, setIsMobile]   = useState(false)
@@ -62,12 +47,6 @@ export const Capabilities = () => {
     return () => window.removeEventListener("resize", handleResize)
   }, [])
 
-  // ── DECRYPTION SCRAMBLE ─────────────────────────────────────────────
-  // Directive: "Every content section should initialize as a [CLASSIFIED]
-  // tile that decrypts — character-by-character at ~8ms per char — as it
-  // enters the viewport." Here we scramble the section title from hex
-  // noise to the final word. No GSAP premium TextPlugin required — pure
-  // rAF + direct textContent writes, zero React re-renders per frame.
   const titleTextRef = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
@@ -77,8 +56,8 @@ export const Capabilities = () => {
 
     const target = t.title
     const CHARS  = "0123456789ABCDEF!@#$%&*<>/?^~+=-|[]{}"
-    const PER_CHAR_MS = 18   // ~55 chars/s reveal — audit spec ~8ms floor
-    const WARMUP_MS   = 120  // initial full-noise chaos window
+    const PER_CHAR_MS = 18   
+    const WARMUP_MS   = 120  
     let raf = 0
     let start = 0
 
@@ -87,7 +66,6 @@ export const Capabilities = () => {
       const elapsed = now - start
       let out = ""
       for (let i = 0; i < target.length; i++) {
-        // Each character locks at WARMUP + i * PER_CHAR
         if (elapsed >= WARMUP_MS + i * PER_CHAR_MS) out += target[i]
         else if (target[i] === " ") out += " "
         else out += CHARS[Math.floor(Math.random() * CHARS.length)]
@@ -159,9 +137,9 @@ export const Capabilities = () => {
     { scope: sectionRef, dependencies: [isMounted, isMobile] }
   )
 
-  // Velocity-driven grid stretch — single rAF, direct style mutation
+  // ── REGRESSION 02 FIX: Velocity rAF gated on mobile ───────────────
   useEffect(() => {
-    if (!isMounted) return
+    if (!isMounted || isMobile) return
     let raf = 0
     const tick = () => {
       const { normalized, intensity } = velocityBus.get()
@@ -176,11 +154,11 @@ export const Capabilities = () => {
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [isMounted])
+  }, [isMounted, isMobile])
 
   const handleMouseMove = (e: React.MouseEvent, index: number) => {
     if (isMobile) return
-    const el        = nodesRef.current[index]
+    const el         = nodesRef.current[index]
     const magneticEl = magneticRefs.current[index]
     if (!el || !magneticEl) return
     const rect = el.getBoundingClientRect()
@@ -205,22 +183,16 @@ export const Capabilities = () => {
       })
   }
 
-  // ── THE ORGANIC SINGULARITY ─────────────────────────────────────────────
-  // Click handler dispatches the WebGL shockwave AND fires a GSAP burst
-  // on the text element. Both are additive — the WebGL bends the fluid
-  // BEHIND the text while the DOM reacts ON TOP of it. One living surface.
   const handlePointerDown = (e: React.PointerEvent, index: number) => {
     ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
 
     const magneticEl = magneticRefs.current[index]
     const textEl     = textSpanRefs.current[index]
 
-    // ── WebGL shockwave (unchanged) ────────────────────────────────────
     window.dispatchEvent(
       new CustomEvent("webgl-shoot", { detail: { x: e.clientX, y: e.clientY } })
     )
 
-    // ── Pill scale punch ───────────────────────────────────────────────
     if (magneticEl) {
       gsap.fromTo(
         magneticEl,
@@ -234,13 +206,7 @@ export const Capabilities = () => {
       )
     }
 
-    // ── Text letter-burst — synced to shockwave ring timing ────────────
-    // The WebGL ring expands at uClickRipple * 3.0 world units.
-    // At 120ms the ring has traveled ~15% of its journey and is roughly
-    // passing through the element origin — that's when we peak the burst.
     if (textEl) {
-      // The "tracking widest" Tailwind class maps to letter-spacing: 0.1em.
-      // We burst to 0.55em then return to 0.1em.
       gsap.timeline({ overwrite: "auto" })
         .fromTo(
           textEl,
@@ -250,7 +216,6 @@ export const Capabilities = () => {
             opacity: 1,
           },
           {
-            // Phase 1 — the blast: letters snap apart
             letterSpacing: "0.55em",
             filter: "blur(3px)",
             opacity: 0.7,
@@ -259,21 +224,18 @@ export const Capabilities = () => {
           }
         )
         .to(textEl, {
-          // Phase 2 — silk collapse back: letters magnetic-snap together
           letterSpacing: "0.1em",
           filter: "blur(0px)",
           opacity: 1,
           duration: 0.85,
           ease: ease.silk,
         })
-        // Phase 3 — micro overshoot: letters compress slightly past home
         .to(textEl, {
           letterSpacing: "0.06em",
           duration: 0.2,
           ease: ease.mechanical,
         })
         .to(textEl, {
-          // Settle at true home
           letterSpacing: "0.1em",
           duration: 0.4,
           ease: ease.silk,
@@ -284,16 +246,14 @@ export const Capabilities = () => {
   if (!isMounted) return <section className="min-h-[100svh] bg-transparent" />
 
   return (
+    // ── REGRESSION 02 FIX: Added 'isolate' to restore iOS overflow hidden ──
     <section
       ref={sectionRef}
       id="capabilities"
-      className="relative w-full min-h-[100svh] z-10 flex flex-col items-center justify-center overflow-hidden py-24 md:py-0"
+      className="relative isolate w-full min-h-[100svh] z-10 flex flex-col items-center justify-center overflow-hidden py-24 md:py-0"
     >
       <div className="cap-title relative md:absolute md:inset-0 flex items-center justify-center pointer-events-none z-10 px-4 mb-12 md:mb-0 w-full overflow-hidden md:overflow-visible">
         <h2 className="font-sans font-black text-[clamp(2.5rem,14vw,16rem)] uppercase tracking-[-0.05em] leading-[0.82] text-white/50 md:text-white/8 mix-blend-normal whitespace-nowrap w-full text-center">
-          {/* textContent is imperatively swapped by the decryption scramble.
-              `font-variant-numeric: tabular-nums` + the hex glyph palette
-              keeps the word width stable during the chaos window. */}
           <span
             ref={titleTextRef}
             style={{ fontVariantNumeric: "tabular-nums", display: "inline-block" }}
@@ -346,17 +306,19 @@ export const Capabilities = () => {
               <div
                 ref={(el) => { magneticRefs.current[i] = el! }}
                 className={baseClasses}
+                // ── REGRESSION 02 FIX: Mobile transforms removed to stop bleeding ──
                 style={{
                   ["--cap-stretch" as any]: 1,
                   ["--cap-skew"    as any]: "0deg",
-                  transform:
-                    "translate(-50%, -50%) scaleY(var(--cap-stretch)) skewX(var(--cap-skew))",
-                  willChange: "transform",
-                  transition:
-                    "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                  transform: isMobile
+                    ? undefined
+                    : "translate(-50%, -50%) scaleY(var(--cap-stretch)) skewX(var(--cap-skew))",
+                  willChange: isMobile ? undefined : "transform",
+                  transition: isMobile
+                    ? undefined
+                    : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
                 }}
               >
-                {/* textSpanRefs — the DOM target for the letter-burst animation */}
                 <span
                   ref={(el) => { textSpanRefs.current[i] = el! }}
                   className={textClasses}

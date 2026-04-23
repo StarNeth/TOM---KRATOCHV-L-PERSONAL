@@ -48,6 +48,37 @@
  *    Height samples:                1 (reused across body/ridge/CA/BRDF)
  *    Normal reconstruction:         free (dFdx / dFdy are hardware ops)
  * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DIRECTOR'S SURGICAL PATCH — REGRESSION 01 (Hardware Handshake Failure)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *   1. `failIfMajorPerformanceCaveat` removed on mobile (iOS Safari returns
+ *      null on any throttled session → R3F crashes before onCreated fires).
+ *   2. `powerPreference` downshifted to "default" on mobile (lets the driver
+ *      manage thermals; "high-performance" drains thermal budget in <30s
+ *      on iOS and triggers an OS-level context kill).
+ *   3. `handleCreated` now binds `webglcontextrestored` with preventDefault
+ *      on loss so the OS may attempt a context restore.
+ *   4. Canvas wrapped in <WebGLErrorBoundary/> so a post-mount context
+ *      loss degrades to the CSS fallback instead of the Next.js error UI.
+ *   5. EffectComposer on mobile: CA pass skipped (extra render target),
+ *      Bloom `mipmapBlur` disabled on mobile (requires MRT).
+ *
+ * DIRECTOR'S SURGICAL PATCH — REGRESSION 03 (Mobile Shader Color Death)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *   6. `fluidRidge` thresholds recalibrated under `#if IS_MOBILE == 1`
+ *      (3-octave FBM peaks at ~0.82, not ~0.97).
+ *   7. `crushed = pow(h, 5.0)` recalibrated to `pow(h, 2.6)` on mobile
+ *      (matches the lower 3-octave ceiling).
+ *   8. Static light vector `L` replaced on mobile with a slow synthetic
+ *      drift (~0.12 rad/s) so the specular hotspot traverses the surface
+ *      without touch input.
+ *   9. Iridescent ambient layer + AO-gated cool-tint floor added on mobile
+ *      to compensate for the absent CA postprocessing + shader-side CA.
+ *
+ * All desktop paths are untouched — every mobile change is gated by
+ * `#if IS_MOBILE` in GLSL or the `isMobile` branch in TypeScript.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import { useRef, useMemo, useEffect, useState, useCallback } from "react"
@@ -65,6 +96,7 @@ import gsap from "gsap"
 import { useMobile } from "@/hooks/use-mobile"
 import { useWebGLSupport } from "@/hooks/use-webgl-support"
 import { CSSFallbackGradient } from "./css-fallback-gradient"
+import { WebGLErrorBoundary } from "./WebGLErrorBoundary"
 import { velocityBus } from "@/lib/velocity-bus"
 // cursorBus lives in its own file so cursor.tsx (statically imported by
 // the root layout on every route — including /work/[id]) doesn't drag
@@ -246,8 +278,15 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       return clamp(h, 0.0, 1.0);
     }
 
+    // ── REGRESSION 03 FIX — ridge threshold recalibrated on mobile ────
+    // Mobile calibration: 3-octave FBM peaks at ~0.82 → lower thresholds.
+    // Desktop calibration: 4-octave FBM peaks at ~0.97 → original thresholds.
     float fluidRidge(float h) {
+      #if IS_MOBILE == 1
+      float crest = smoothstep(0.38, 0.60, h);
+      #else
       float crest = smoothstep(0.50, 0.74, h);
+      #endif
       return crest * crest;
     }
 
@@ -311,7 +350,14 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       vec3 N, float ao
     ) {
       // 1. Body — crushed height → vast dark floor, gentle mid-tone rise
+      //    REGRESSION 03 FIX: pow(h, 5.0) calibrated for 4-octave FBM ceiling.
+      //    On mobile (3-octave, ceiling ~0.82), pow(h, 2.6) preserves the
+      //    same color spread across the lower practical range.
+      #if IS_MOBILE == 1
+      float crushed = pow(h, 2.6);
+      #else
       float crushed = pow(h, 5.0);
+      #endif
       vec3 body = mix(floorCol, peakCol, crushed * 0.35);
 
       // 2. Ridge energy (the "ferrofluid spike" bloom target)
@@ -320,8 +366,20 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
 
       // 3. GGX specular — light direction parallax-shifts with cursor,
       //    adding a second light that tracks the mouse for depth cues.
+      //    REGRESSION 03 FIX: on mobile, uMouse/uCursor never update, so
+      //    L collapses to (0,0,1) → zero angular variance → near-zero
+      //    specular everywhere. A slow synthetic drift gives the surface
+      //    the "light across liquid" motion. Cost: 2 trig ops per pixel.
       vec3 V = vec3(0.0, 0.0, 1.0);                               // fixed viewer
+      #if IS_MOBILE == 1
+      vec3 L = normalize(vec3(
+        sin(uTime * 0.12) * 0.28,
+        cos(uTime * 0.09) * 0.22,
+        1.3
+      ));
+      #else
       vec3 L = normalize(vec3(uMouse * 0.6 + uCursor * 0.4, 1.3));// parallax light
+      #endif
       vec3 H = normalize(L + V);
       float NdotL = max(dot(N, L), 0.0);
       float NdotV = max(dot(N, V), 0.0);
@@ -339,6 +397,21 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
 
       // 4. Apply AO only to the diffuse/body contribution — peaks glow freely.
       vec3 lit = body * ao + specular * NdotL * 1.35 + ridgeEmit;
+
+      // ── REGRESSION 03 FIX — synthetic iridescence + AO cool tint ────
+      // Compensates for the absent CA postprocessing pass and the missing
+      // shader-side CA block on mobile. Slowly-shifting hue mapped from
+      // surface height → chromatic obsidian shimmer. Ridge-gated, so the
+      // floor remains dark and credible. ~4 arithmetic ops per pixel,
+      // zero extra noise samples.
+      #if IS_MOBILE == 1
+      float iridHue  = fract(h * 0.32 + uTime * 0.007);
+      vec3  iridescent = 0.5 + 0.5 * cos(6.28318 * (iridHue + vec3(0.00, 0.33, 0.67)));
+      lit += iridescent * 0.09 * ridge;
+      // Secondary: subtle AO-gated ambient prevents the floor from reading
+      // as uniform black. Deep valleys get a faint cool tint — perceptual depth.
+      lit += vec3(0.008, 0.010, 0.018) * (1.0 - ao) * 0.6;
+      #endif
 
       // 5. Reader protection at end of scroll
       float dimming = mix(1.0, 0.4, smoothstep(0.85, 1.0, uScrollProgress));
@@ -608,10 +681,24 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
   const shouldUseFallback =
     !forceRender && (hasWebGLError || (isReady && !canUseWebGL))
 
+  // ── REGRESSION 01 FIX — context loss/restore with preventDefault ─────
+  // preventDefault on `webglcontextlost` signals the browser that we
+  // WANT a restore attempt. On iOS this is the difference between a
+  // black page and the OS recovering the GPU context after a thermal
+  // event. `webglcontextrestored` clears the error flag and R3F
+  // handles re-initialization internally.
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
-    gl.domElement.addEventListener("webglcontextlost", () =>
+    const canvas = gl.domElement
+
+    canvas.addEventListener("webglcontextlost", (e: Event) => {
+      e.preventDefault()
       setHasWebGLError(true)
-    )
+    })
+
+    canvas.addEventListener("webglcontextrestored", () => {
+      setHasWebGLError(false)
+    })
+
     window.dispatchEvent(new CustomEvent("webgl-ready"))
   }, [])
 
@@ -628,43 +715,82 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
   }
 
   return (
-    <div className="fixed inset-0 w-full h-full z-0 pointer-events-none">
-      <Canvas
-        orthographic
-        camera={{ position: [0, 0, 1], left: -1, right: 1, top: 1, bottom: -1 }}
-        dpr={isMobile ? 1 : 1.5}
-        gl={{
-          powerPreference: "high-performance",
-          alpha: false,
-          antialias: !isMobile,
-          stencil: false,
-          depth: false,
-          failIfMajorPerformanceCaveat: true,
-        }}
-        onCreated={handleCreated}
-      >
-        <mesh>
-          <planeGeometry args={[2, 2]} />
-          <LiquidObsidianMaterial isMobile={isMobile} onFirstFrame={handleFirstFrame} />
-        </mesh>
+    // ── REGRESSION 01 FIX — WebGLErrorBoundary wraps the Canvas ────────
+    // Context-loss after mount no longer crashes the page — it degrades
+    // to CSSFallbackGradient via React's error boundary mechanism.
+    <WebGLErrorBoundary>
+      <div className="fixed inset-0 w-full h-full z-0 pointer-events-none">
+        <Canvas
+          orthographic
+          camera={{ position: [0, 0, 1], left: -1, right: 1, top: 1, bottom: -1 }}
+          dpr={isMobile ? 1 : 1.5}
+          gl={{
+            // ── REGRESSION 01 FIX — mobile GL option softening ──────────
+            // powerPreference: "default" on mobile — the OS driver can
+            // manage clocks/thermals. "high-performance" drains the budget
+            // in <30s on iOS and causes OS-level context kills.
+            powerPreference: isMobile ? "default" : "high-performance",
+            alpha: false,
+            antialias: !isMobile,
+            stencil: false,
+            depth: false,
+            // failIfMajorPerformanceCaveat intentionally absent on mobile.
+            // iOS Safari returns null from getContext() on any throttled
+            // session — R3F then throws synchronously and Next.js reports
+            // it as a page-level failure ("This page couldn't load").
+            // Desktop keeps the quality gate; mobile accepts any context.
+            ...(isMobile ? {} : { failIfMajorPerformanceCaveat: true }),
+          }}
+          onCreated={handleCreated}
+        >
+          <mesh>
+            <planeGeometry args={[2, 2]} />
+            <LiquidObsidianMaterial isMobile={isMobile} onFirstFrame={handleFirstFrame} />
+          </mesh>
 
-        <EffectComposer multisampling={0} enableNormalPass={false}>
-          <Bloom
-            intensity={0.75}
-            luminanceThreshold={1.0}
-            luminanceSmoothing={0.15}
-            mipmapBlur
-            radius={0.82}
-          />
-          <VelocityCAController isMobile={isMobile} />
-          <Noise
-            premultiply={false}
-            blendFunction={BlendFunction.NORMAL}
-            opacity={isMobile ? 0.010 : 0.018}
-          />
-          <Vignette eskil={false} offset={0.18} darkness={0.88} />
-        </EffectComposer>
-      </Canvas>
-    </div>
+          {/* ── REGRESSION 01 FIX — EffectComposer simplified on mobile ──
+              Bloom `mipmapBlur` requires MRT and is disabled on mobile.
+              The ChromaticAberration pass is a full additional render
+              target and is skipped on mobile entirely — the shader-side
+              CA block already handled chromatic correction on desktop,
+              and REGRESSION 03's iridescent ambient layer substitutes
+              for it on mobile. */}
+          {isMobile ? (
+          <EffectComposer multisampling={0} enableNormalPass={false}>
+            <Bloom
+              intensity={0.55}
+              luminanceThreshold={1.2}
+              luminanceSmoothing={0.15}
+              mipmapBlur={false}
+              radius={0.55}
+            />
+            <Noise
+              premultiply={false}
+              blendFunction={BlendFunction.NORMAL}
+              opacity={0.010}
+            />
+            <Vignette eskil={false} offset={0.22} darkness={0.88} />
+          </EffectComposer>
+        ) : (
+          <EffectComposer multisampling={0} enableNormalPass={false}>
+            <Bloom
+              intensity={0.75}
+              luminanceThreshold={1.0}
+              luminanceSmoothing={0.15}
+              mipmapBlur={true}
+              radius={0.82}
+            />
+            <VelocityCAController isMobile={false} />
+            <Noise
+              premultiply={false}
+              blendFunction={BlendFunction.NORMAL}
+              opacity={0.018}
+            />
+            <Vignette eskil={false} offset={0.18} darkness={0.88} />
+          </EffectComposer>
+        )}
+        </Canvas>
+      </div>
+    </WebGLErrorBoundary>
   )
 }
