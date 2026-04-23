@@ -9,6 +9,7 @@ import { useLenis } from "lenis/react"
 import { Globe, Activity, Circle } from "lucide-react"
 import { useLanguage } from "@/components/navigation/language-toggle"
 import { ease } from "@/lib/easing"
+import { velocityBus } from "@/lib/velocity-bus"
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(useGSAP, ScrollTrigger)
@@ -253,41 +254,163 @@ const MobileMenuOverlay = ({
 }
 
 // ── TELEMETRY ───────────────────────────────────────────────────────────
-// The previous ugly fixed bottom bar has been killed. The three live
-// values (SYS_DEPTH / FPS / UPTIME) are now page metadata — 7–8px
-// monospace annotations sitting inside the existing header row at 40%
-// opacity, written imperatively via refs so React never re-renders.
+// Five live values written imperatively into DOM refs — React NEVER
+// re-renders per frame. What ships to the HUD:
+//
+//   SEC       — security handshake status ({SECURE|HANDSHAKE|LOCKED})
+//               derived from a micro state machine that listens to
+//               velocity events and flashes HANDSHAKE for 280ms on
+//               scroll-start transitions (IDLE → NAVIGATING).
+//   SECTION   — zero-padded index of the currently-visible major
+//               section (00=hero, 01=about, 02=work, 03=capabilities,
+//               04=contact). Updated by IntersectionObserver — not
+//               by scroll math — so it can never drift from reality.
+//   SYS_DEPTH — virtual camera Z in viewport units (scrollY ÷ innerHeight)
+//               formatted to 4 decimals. Zero at hero, grows as the
+//               reader dolly-pushes through the scene.
+//   FPS       — rolling rAF window (60-frame buffer).
+//   UPTIME    — ms since mount, formatted HH:MM:SS.
+//
+// STATE MACHINE
+//   BOOT → IDLE → NAVIGATING → SECTION_LOCK
+//                     ↓
+//                CONTACT_ARMED (section 04 only)
+// Transitions are fired by the velocity bus (scroll start/settle) and
+// the section observer (04 reached → armed).
 const pad2 = (n: number) => n.toString().padStart(2, "0")
-const pad4 = (n: number) => n.toString().padStart(4, "0")
+const padDepth = (n: number) => n.toFixed(4)
+
+type HUDState =
+  | "BOOT"
+  | "IDLE"
+  | "NAVIGATING"
+  | "SECTION_LOCK"
+  | "CONTACT_ARMED"
 
 type TelemetryRefs = {
-  depth:  React.RefObject<HTMLSpanElement | null>
-  fps:    React.RefObject<HTMLSpanElement | null>
-  uptime: React.RefObject<HTMLSpanElement | null>
+  depth:   React.RefObject<HTMLSpanElement | null>
+  fps:     React.RefObject<HTMLSpanElement | null>
+  uptime:  React.RefObject<HTMLSpanElement | null>
+  sec:     React.RefObject<HTMLSpanElement | null>
+  section: React.RefObject<HTMLSpanElement | null>
+}
+
+// Minimum system-character pool for the handshake scramble — identical
+// to the "military readout" aesthetic spec'd in the brief. 220ms @ ~60Hz
+// = 13 frames of scramble noise, then the target string locks in.
+const SEC_CHARS = "01ABCDEF_·×◆"
+const scrambleSec = (el: HTMLSpanElement, target: string, durMs = 220) => {
+  const start = performance.now()
+  let raf = 0
+  const step = (now: number) => {
+    const t = Math.min(1, (now - start) / durMs)
+    if (t < 1) {
+      let out = ""
+      for (let i = 0; i < target.length; i++) {
+        out += t > i / target.length
+          ? target[i]
+          : SEC_CHARS[(Math.random() * SEC_CHARS.length) | 0]
+      }
+      el.textContent = out
+      raf = requestAnimationFrame(step)
+    } else {
+      el.textContent = target
+    }
+  }
+  raf = requestAnimationFrame(step)
+  return () => cancelAnimationFrame(raf)
 }
 
 const useTelemetry = (): TelemetryRefs => {
-  // Inicializace s null je standard
-  const depth  = useRef<HTMLSpanElement>(null)
-  const fps    = useRef<HTMLSpanElement>(null)
-  const uptime = useRef<HTMLSpanElement>(null)
+  const depth   = useRef<HTMLSpanElement>(null)
+  const fps     = useRef<HTMLSpanElement>(null)
+  const uptime  = useRef<HTMLSpanElement>(null)
+  const sec     = useRef<HTMLSpanElement>(null)
+  const section = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === "undefined") return
 
     const sessionStart = performance.now()
-    let frames = 0
-    let fpsLastT = performance.now()
+    // Rolling FPS window — genuine 60-frame measurement, not GSAP ticker.
+    const frameTimes: number[] = []
     let raf = 0
 
-    const tick = (now: number) => {
-      frames++
+    // ── STATE MACHINE ──────────────────────────────────────────────
+    let hudState: HUDState = "BOOT"
+    let lastVelocityAbs = 0
+    let navigateReleaseAt = 0
+    let sectionIndex = 0
 
-      // Safe check pomocí optional chainingu nebo ifu
-      if (depth.current) {
-        depth.current.textContent = pad4(Math.max(0, Math.round(window.scrollY)))
+    const transition = (next: HUDState) => {
+      if (next === hudState) return
+      hudState = next
+      if (!sec.current) return
+      if (next === "NAVIGATING")     scrambleSec(sec.current, "HANDSHAKE", 220)
+      else if (next === "CONTACT_ARMED") scrambleSec(sec.current, "LOCKED",    180)
+      else                           scrambleSec(sec.current, "SECURE",    260)
+    }
+
+    // ── SECTION OBSERVER ───────────────────────────────────────────
+    // Hero is section 00 — it doesn't have an id, so we synthesize a
+    // zero-state whenever none of the four content sections are the
+    // most-intersecting entry.
+    const SECTION_IDS = ["about", "work", "capabilities", "contact"]
+    const sectionEls = SECTION_IDS
+      .map((id) => document.getElementById(id))
+      .filter(Boolean) as HTMLElement[]
+
+    const setSectionIndex = (idx: number) => {
+      if (idx === sectionIndex) return
+      sectionIndex = idx
+      if (section.current) section.current.textContent = pad2(idx)
+      if (idx === 4) transition("CONTACT_ARMED")
+      else if (hudState === "CONTACT_ARMED") transition("SECTION_LOCK")
+    }
+
+    let io: IntersectionObserver | null = null
+    if (sectionEls.length > 0) {
+      io = new IntersectionObserver(
+        (entries) => {
+          // Pick the entry with the largest intersection ratio that's
+          // currently above 0.35 — anything less is "entering" territory.
+          let bestIdx = -1
+          let bestRatio = 0
+          for (const e of entries) {
+            if (!e.isIntersecting) continue
+            if (e.intersectionRatio > bestRatio && e.intersectionRatio > 0.35) {
+              bestRatio = e.intersectionRatio
+              bestIdx = SECTION_IDS.indexOf(e.target.id) + 1 // +1 because hero=0
+            }
+          }
+          if (bestIdx < 0 && window.scrollY < window.innerHeight * 0.8) {
+            setSectionIndex(0)                // hero still dominant
+          } else if (bestIdx > 0) {
+            setSectionIndex(bestIdx)
+          }
+        },
+        { threshold: [0.35, 0.55, 0.75] },
+      )
+      sectionEls.forEach((el) => io!.observe(el))
+    }
+
+    const tick = (now: number) => {
+      // ── FPS — true rolling rAF window ─────────────────────────
+      frameTimes.push(now)
+      if (frameTimes.length > 60) frameTimes.shift()
+      if (frameTimes.length > 1 && fps.current) {
+        const elapsed = now - frameTimes[0]
+        const v = Math.round(((frameTimes.length - 1) * 1000) / elapsed)
+        fps.current.textContent = pad2(Math.min(99, v))
       }
 
+      // ── SYS_DEPTH — virtual camera z in viewport units ────────
+      if (depth.current) {
+        const vd = window.scrollY / Math.max(1, window.innerHeight)
+        depth.current.textContent = padDepth(vd)
+      }
+
+      // ── UPTIME — ms since mount, HH:MM:SS ──────────────────────
       if (uptime.current) {
         const secs = Math.floor((now - sessionStart) / 1000)
         const h = Math.floor(secs / 3600)
@@ -296,21 +419,35 @@ const useTelemetry = (): TelemetryRefs => {
         uptime.current.textContent = `${pad2(h)}:${pad2(m)}:${pad2(s)}`
       }
 
-      if (now - fpsLastT > 500 && fps.current) {
-        const v = Math.round((frames * 1000) / (now - fpsLastT))
-        fps.current.textContent = pad2(Math.min(99, v))
-        frames = 0
-        fpsLastT = now
+      // ── STATE MACHINE DRIVER ───────────────────────────────────
+      // BOOT transitions on first tick. NAVIGATING is entered whenever
+      // normalized velocity exceeds a small threshold; after 280ms of
+      // settled-below-threshold, we drop back to SECTION_LOCK.
+      if (hudState === "BOOT") transition("IDLE")
+      const vAbs = Math.abs(velocityBus.get().normalized)
+      if (vAbs > 0.03 && lastVelocityAbs <= 0.03) {
+        transition("NAVIGATING")
+        navigateReleaseAt = 0
       }
+      if (vAbs <= 0.03 && hudState === "NAVIGATING") {
+        if (navigateReleaseAt === 0) navigateReleaseAt = now + 280
+        else if (now >= navigateReleaseAt) {
+          transition(sectionIndex === 4 ? "CONTACT_ARMED" : "SECTION_LOCK")
+        }
+      }
+      lastVelocityAbs = vAbs
 
       raf = requestAnimationFrame(tick)
     }
 
     raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      cancelAnimationFrame(raf)
+      if (io) io.disconnect()
+    }
   }, [])
 
-  return { depth, fps, uptime }
+  return { depth, fps, uptime, sec, section }
 }
 
 // ── HAMBURGER ───────────────────────────────────────────────────────────
@@ -508,11 +645,24 @@ export const Header = () => {
           <div
             aria-hidden
             className="sys-element hidden md:flex justify-end items-center gap-x-4 mt-1.5 font-mono text-[8px] tracking-[0.22em] uppercase text-white/40 select-none pointer-events-none"
+            style={{
+              fontVariantNumeric: "tabular-nums",
+              fontFeatureSettings: '"tnum" 1, "zero" 1',
+              letterSpacing: "0.22em",
+            }}
           >
             <span className="flex items-center gap-1">
+              <span className="opacity-60">SEC</span>
+              <span ref={telemetry.sec} className="tabular-nums text-white/70">SECURE</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="opacity-60">SECTION</span>
+              <span ref={telemetry.section} className="tabular-nums">00</span>
+            </span>
+            <span className="flex items-center gap-1">
               <span className="opacity-60">SYS_DEPTH</span>
-              <span ref={telemetry.depth} className="tabular-nums">0000</span>
-              <span className="opacity-50">PX</span>
+              <span ref={telemetry.depth} className="tabular-nums">0.0000</span>
+              <span className="opacity-50">VP</span>
             </span>
             <span className="flex items-center gap-1">
               <span className="opacity-60">FPS</span>

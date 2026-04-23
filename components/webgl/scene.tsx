@@ -231,12 +231,26 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       return sum;
     }
 
-    // ── DOMAIN-WARPED HEIGHT FIELD ────────────────────────────────────
+    // ── RECURSIVE DOMAIN-WARPED HEIGHT FIELD ──────────────────────────
+    // True self-referential warp (Iñigo Quilez "fbm of fbm of fbm"):
+    //   q = fbm(p)
+    //   r = fbm(p + k·q)              ← sample coord ITSELF is warped
+    //   h = fbm(p + k·r)
+    // The second pass's sample position is the output of the first —
+    // producing non-repeating convective patterns, not layered octaves.
     // Warp magnitude is modulated by velocity-driven turbulence.
     float fluidHeight(vec2 p, float mousePower) {
       float warpAmp = 2.4 + uTurbulence * 1.8;           // 2.4 → 4.2 at peak
+      // First warp — coarse displacement field (1 FBM).
       float n1 = fbm(p * 1.4 + vec2(uTime * 0.04, uTime * 0.03));
       vec2  warped = p * 1.6 + vec2(n1 * warpAmp, n1 * (warpAmp * 0.75));
+      // Second warp — the SAMPLE POSITION is driven by the first pass's
+      // own output. This is the self-reference; without it the warp is
+      // just a UV offset, with it the surface reads as fluid-within-fluid.
+      #if IS_MOBILE == 0
+        float n2 = fbm(warped * 1.15 + vec2(1.7, 9.2) + uTime * 0.03);
+        warped += vec2(n2, n2 * 0.85) * warpAmp * 0.42;
+      #endif
       float h = fbm(warped + uTime * 0.02);
       h += mousePower * 0.25;
       // Cursor as force: decaying wake pushes h upward in cursor's trail
@@ -305,10 +319,15 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       return F0 + (1.0 - F0) * pow(1.0 - cosT, 5.0);
     }
 
-    // ── COLOR FROM HEIGHT + BRDF + AO ────────────────────────────────
+    // ── COLOR FROM HEIGHT + BRDF (ISOTROPIC + ANISOTROPIC) + AO ──────
+    // `dH` is the screen-space gradient of the height field — it's the
+    // flow tangent. We pass it in so the anisotropic specular axes can
+    // align to the FLUID, not the screen. That's the signature look of
+    // real brushed / machined metal: highlights elongate ALONG the
+    // microstructure, not along a fixed world axis.
     vec3 shadeSurface(
       float h, float ridge, vec3 floorCol, vec3 peakCol,
-      vec3 N, float ao
+      vec3 N, float ao, vec2 dH
     ) {
       // 1. Body — crushed height → vast dark floor, gentle mid-tone rise
       float crushed = pow(h, 5.0);
@@ -330,15 +349,43 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
 
       // Obsidian F0 ≈ dielectric; ramps toward chromium-metal at peak
       vec3 F0 = mix(vec3(0.035), peakCol * 0.75, ridge * 0.9);
-      float roughness = mix(0.38, 0.12, ridge); // crests are glossier
+
+      // ── SPATIAL ROUGHNESS VARIANCE ────────────────────────────────
+      // Base: crests are glossier than troughs. On top of that, we bias
+      // by the height field itself so ultra-glossy pools form alongside
+      // matte volcanic regions. Clamped so we never escape physical PBR.
+      float roughnessBase = mix(0.38, 0.12, ridge);
+      float roughness = clamp(roughnessBase + (h - 0.5) * 0.22, 0.05, 0.55);
 
       float D = D_GGX(NdotH, roughness);
       float G = G_Smith(NdotV, NdotL, roughness);
       vec3  F = F_Schlick(F0, VdotH);
       vec3 specular = (D * G) * F / max(4.0 * NdotV * NdotL, 1e-3);
 
+      // ── ANISOTROPIC SECONDARY SPEC (Ashikhmin-Shirley) ────────────
+      // Aligned to the FBM gradient — the direction of fluid flow.
+      // nu/nv asymmetry is what makes the highlight elongate along the
+      // grain. Zero extra noise samples: dH is already hardware-free.
+      vec3 T = normalize(vec3(dH, 0.0) + vec3(1e-5, 0.0, 0.0));
+      vec3 B = normalize(cross(N, T));
+      T      = normalize(cross(B, N));     // re-orthogonalize
+      float TdotH = dot(T, H);
+      float BdotH = dot(B, H);
+      float nu = 420.0;                     // sharp ALONG flow
+      float nv = 10.0;                      // broad ACROSS flow ("drag")
+      float denom = max(1.0 - NdotH * NdotH, 1e-3);
+      float anisoExp = (nu * TdotH * TdotH + nv * BdotH * BdotH) / denom;
+      float anisoSpec = sqrt((nu + 1.0) * (nv + 1.0)) / (8.0 * PI) *
+                        pow(NdotH, anisoExp);
+      // Gated by ridge — we only want the titanium sheen on the crests
+      // where the material reads as metallic, not in the matte floor.
+      vec3 anisoLayer = F * anisoSpec * (0.32 + ridge * 0.9);
+
       // 4. Apply AO only to the diffuse/body contribution — peaks glow freely.
-      vec3 lit = body * ao + specular * NdotL * 1.35 + ridgeEmit;
+      vec3 lit = body * ao
+               + specular   * NdotL * 1.35
+               + anisoLayer * NdotL * 0.85
+               + ridgeEmit;
 
       // 5. Reader protection at end of scroll
       float dimming = mix(1.0, 0.4, smoothstep(0.85, 1.0, uScrollProgress));
@@ -444,9 +491,17 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       vec3 floorCol, peakCol;
       zoneColors(floorCol, peakCol);
 
-      vec3 baseCol = shadeSurface(h, ridge, floorCol, peakCol, N, ao);
+      vec3 baseCol = shadeSurface(h, ridge, floorCol, peakCol, N, ao, dH);
 
-      // ── RGB CHROMATIC ABERRATION (shader-side, cheap differential) ──
+      // ── RGB CHROMATIC ABERRATION with ABBE DISPERSION ───────────────
+      // Screen-edge CA is the ambient term — blue leads because glass
+      // has a lower Abbe number at short wavelengths. When a shockwave
+      // is active, the split axis rotates radially from its origin and
+      // the wavefront amplitude feeds back into the dispersion magnitude
+      // via the Cauchy equation: n(λ) ≈ A + B/λ². Concretely, R uses a
+      // 0.82 coefficient, G is the pivot at 1.0 (sampled from baseCol),
+      // and B leads with 1.18 — the same ratios that describe real
+      // crown-glass dispersion.
       vec3 finalCol = baseCol;
       #if IS_MOBILE == 0
       {
@@ -455,13 +510,21 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
         float split     = (0.004 + 0.028 * uIntensity) * edge;
         vec2  splitDir  = vec2(sign(uVelocity + 0.0001), 0.0);
 
-        float micro = split * 5.0;
-        float hR = clamp(h + (vnoise(p + splitDir * micro + 0.5) - 0.5) * 0.28, 0.0, 1.0);
-        float hB = clamp(h + (vnoise(p - splitDir * micro + 0.5) - 0.5) * 0.28, 0.0, 1.0);
+        // Shockwave contribution — radial, physically scaled by waveform.
+        float shockwave = isExploding * edgeGlow;
+        vec2  radialCA  = radialDir * shockwave * 1.6;
+        splitDir        = splitDir + radialCA;
+
+        float micro  = split * 5.0 + shockwave * 0.015;
+        float microR = micro * 0.82;   // red — lowest dispersion
+        float microB = micro * 1.18;   // blue — leads the wavefront
+
+        float hR = clamp(h + (vnoise(p + splitDir * microR + 0.5) - 0.5) * 0.28, 0.0, 1.0);
+        float hB = clamp(h + (vnoise(p - splitDir * microB + 0.5) - 0.5) * 0.28, 0.0, 1.0);
         float ridgeR = fluidRidge(hR);
         float ridgeB = fluidRidge(hB);
-        vec3 rCol = shadeSurface(hR, ridgeR, floorCol, peakCol, N, ao);
-        vec3 bCol = shadeSurface(hB, ridgeB, floorCol, peakCol, N, ao);
+        vec3 rCol = shadeSurface(hR, ridgeR, floorCol, peakCol, N, ao, dH);
+        vec3 bCol = shadeSurface(hB, ridgeB, floorCol, peakCol, N, ao, dH);
         finalCol = vec3(rCol.r, baseCol.g, bCol.b);
       }
       #endif
@@ -538,10 +601,42 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
     c.vx *= 0.82
     c.vy *= 0.82
 
-    // ── FIRST-FRAME SIGNAL — preloader gates its exit on this ─────────
+    // ── FIRST-FRAME SIGNAL — gl.fenceSync ensures the GPU has actually
+    // executed the queued commands before we dismiss the preloader.
+    // Without this gate, the preloader hands off to a scene whose
+    // shaders are still compiling / whose first PP frame is still
+    // being built → guaranteed frame drop at first interactive input.
+    // clientWaitSync with timeout=0 is a non-blocking poll, identical
+    // in spirit to gl.finish() but asynchronous. On WebGL1 contexts we
+    // fall back to the plain frame-count check.
     if (!firedRef.current && state.gl.info.render.frame >= 1) {
       firedRef.current = true
-      onFirstFrame()
+      const raw = state.gl.getContext() as WebGLRenderingContext &
+        Partial<WebGL2RenderingContext>
+      if (typeof raw.fenceSync === "function") {
+        const sync = raw.fenceSync(
+          (raw as WebGL2RenderingContext).SYNC_GPU_COMMANDS_COMPLETE,
+          0,
+        )
+        raw.flush()
+        const poll = () => {
+          if (!sync) { onFirstFrame(); return }
+          const status = (raw as WebGL2RenderingContext).clientWaitSync(sync, 0, 0)
+          const gl2 = WebGL2RenderingContext
+          if (
+            status === gl2.ALREADY_SIGNALED ||
+            status === gl2.CONDITION_SATISFIED
+          ) {
+            ;(raw as WebGL2RenderingContext).deleteSync(sync)
+            onFirstFrame()
+          } else {
+            requestAnimationFrame(poll)
+          }
+        }
+        requestAnimationFrame(poll)
+      } else {
+        onFirstFrame()
+      }
     }
   })
 
@@ -605,6 +700,25 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
   const { canUseWebGL, isReady } = useWebGLSupport()
   const [hasWebGLError, setHasWebGLError] = useState(false)
 
+  // ── POSTPROCESSING BUDGET PROTECTION ──────────────────────────────────
+  // The CA + Noise + Vignette + Bloom pipeline compiles ~8 shaders and
+  // builds a G-buffer on first mount. If that work lands in the same
+  // frame as TTI we drop frames. `requestIdleCallback` defers this to
+  // the first idle period after paint — the user has ALREADY seen the
+  // base shader by then, so the postproc boot is invisible.
+  const [postprocReady, setPostprocReady] = useState(false)
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const ric: typeof window.requestIdleCallback | undefined =
+      (window as any).requestIdleCallback
+    if (ric) {
+      const id = ric(() => setPostprocReady(true), { timeout: 800 })
+      return () => (window as any).cancelIdleCallback?.(id)
+    }
+    const t = window.setTimeout(() => setPostprocReady(true), 500)
+    return () => window.clearTimeout(t)
+  }, [])
+
   const shouldUseFallback =
     !forceRender && (hasWebGLError || (isReady && !canUseWebGL))
 
@@ -648,22 +762,24 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
           <LiquidObsidianMaterial isMobile={isMobile} onFirstFrame={handleFirstFrame} />
         </mesh>
 
-        <EffectComposer multisampling={0} enableNormalPass={false}>
-          <Bloom
-            intensity={0.75}
-            luminanceThreshold={1.0}
-            luminanceSmoothing={0.15}
-            mipmapBlur
-            radius={0.82}
-          />
-          <VelocityCAController isMobile={isMobile} />
-          <Noise
-            premultiply={false}
-            blendFunction={BlendFunction.NORMAL}
-            opacity={isMobile ? 0.010 : 0.018}
-          />
-          <Vignette eskil={false} offset={0.18} darkness={0.88} />
-        </EffectComposer>
+        {postprocReady && (
+          <EffectComposer multisampling={0} enableNormalPass={false}>
+            <Bloom
+              intensity={0.75}
+              luminanceThreshold={1.0}
+              luminanceSmoothing={0.15}
+              mipmapBlur
+              radius={0.82}
+            />
+            <VelocityCAController isMobile={isMobile} />
+            <Noise
+              premultiply={false}
+              blendFunction={BlendFunction.NORMAL}
+              opacity={isMobile ? 0.010 : 0.018}
+            />
+            <Vignette eskil={false} offset={0.18} darkness={0.88} />
+          </EffectComposer>
+        )}
       </Canvas>
     </div>
   )

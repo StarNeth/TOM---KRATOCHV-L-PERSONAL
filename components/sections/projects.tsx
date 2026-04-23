@@ -70,20 +70,55 @@ const decrypt = (el: HTMLElement, finalText: string, duration = 1.2) => {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CAST-IRON ASYMMETRIC SPRING
-// Stiff on push (energy injection), heavy/slow on recovery (inertia back to 0).
-// Produces that "dragging a magnetised iron plate" resistance curve — the tilt
-// loads up quickly when you flick scroll, then bleeds off with weight.
+// CAST-IRON ASYMMETRIC SPRING — velocity-integrated, regime-aware.
+//
+// This is NOT a lerp. Each channel carries its own velocity, and the
+// regime (accelerating toward target vs recovering past zero) is decided
+// by the SIGN of velocity relative to the sign of error — not by the
+// magnitude comparison used in first-pass implementations. That means
+// the spring correctly enters RECOVERY when the mass overshoots and
+// begins pulling back, producing the characteristic drift-past-zero
+// settle that reads as a magnetised iron plate, not a CSS transition.
+//
+// Semi-implicit Euler keeps the integrator stable at 120Hz + dt-clamped
+// to a 30fps floor so a dropped frame never injects energy.
 // ─────────────────────────────────────────────────────────────────────────────
-const asymLerp = (
-  current: number,
+interface SpringState { pos: number; vel: number }
+interface SpringConfig {
+  kAccel: number  // stiffness on the attack — high = snappy engagement
+  kRec:   number  // stiffness on recovery  — low  = magnetic drift
+  bAccel: number  // damping on the attack
+  bRec:   number  // damping on recovery   — under-damped so it overshoots
+}
+
+const CAST_IRON: SpringConfig = {
+  kAccel: 380, kRec: 45,
+  bAccel: 28,  bRec: 9.5,
+}
+const CAST_IRON_STRETCH: SpringConfig = {
+  kAccel: 520, kRec: 68,
+  bAccel: 34,  bRec: 12,
+}
+
+const stepSpring = (
+  s: SpringState,
   target: number,
-  stiffPush = 0.22,
-  slowRecovery = 0.055,
+  dt: number,
+  cfg: SpringConfig = CAST_IRON,
 ) => {
-  const accelerating = Math.abs(target) > Math.abs(current)
-  const k = accelerating ? stiffPush : slowRecovery
-  return current + (target - current) * k
+  const error = target - s.pos
+  // Regime detection by velocity-direction, not magnitude. If velocity
+  // is pushing us TOWARD the target (same sign as error) or we're near
+  // rest, we're accelerating. Otherwise we've passed the target and
+  // the spring is recovering.
+  const accelerating =
+    Math.sign(error) === Math.sign(s.vel) || Math.abs(s.vel) < 1e-3
+  const k = accelerating ? cfg.kAccel : cfg.kRec
+  const b = accelerating ? cfg.bAccel : cfg.bRec
+  // Semi-implicit Euler — stable, causally correct.
+  s.vel += (k * error - b * s.vel) * dt
+  s.pos += s.vel * dt
+  return s.pos
 }
 
 export const Projects = () => {
@@ -149,28 +184,36 @@ export const Projects = () => {
     const bg = bgWordRef.current
 
     // Persistent spring state — lives across frames, reset on teardown.
-    let sRotY = 0
-    let sSkewX = 0
-    let sBgSkew = 0
-    let sBgStretch = 1
+    // Each channel has independent position AND velocity so the regime
+    // switch happens CHANNEL-LOCALLY: one channel can be accelerating
+    // while another is recovering.
+    const sRotY      : SpringState = { pos: 0, vel: 0 }
+    const sSkewX     : SpringState = { pos: 0, vel: 0 }
+    const sBgSkew    : SpringState = { pos: 0, vel: 0 }
+    const sBgStretch : SpringState = { pos: 1, vel: 0 }
 
-    const tick = () => {
+    let lastT = performance.now()
+
+    const tick = (now: number) => {
+      // Clamp dt at 30fps floor. A dropped frame must NOT inject energy
+      // into the integrator — that's how you get the "jump" artifact on
+      // every other portfolio.
+      const dt = Math.min((now - lastT) / 1000, 0.033)
+      lastT = now
+
       const { normalized, intensity } = velocityBus.get()
 
       // Velocity-driven targets
-      const tRotY = -normalized * 5
-      const tSkewX = normalized * 2
-      const tBgSkew = normalized * -6
+      const tRotY      = -normalized * 5
+      const tSkewX     =  normalized * 2
+      const tBgSkew    =  normalized * -6
       const tBgStretch = 1 + intensity * 0.1
 
-      // Asymmetric integration — the whole reason this feels heavy
-      sRotY = asymLerp(sRotY, tRotY)
-      sSkewX = asymLerp(sSkewX, tSkewX)
-      sBgSkew = asymLerp(sBgSkew, tBgSkew)
-      // Stretch uses its own asymmetry (push stretches fast, recovery drags)
-      sBgStretch =
-        sBgStretch +
-        (tBgStretch - sBgStretch) * (tBgStretch > sBgStretch ? 0.18 : 0.05)
+      // Semi-implicit Euler with regime-aware stiffness per channel
+      stepSpring(sRotY,      tRotY,      dt)
+      stepSpring(sSkewX,     tSkewX,     dt)
+      stepSpring(sBgSkew,    tBgSkew,    dt)
+      stepSpring(sBgStretch, tBgStretch, dt, CAST_IRON_STRETCH)
 
       const vw = window.innerWidth
       const viewportCenter = vw / 2
@@ -189,15 +232,15 @@ export const Projects = () => {
         const posZ = -Math.abs(offset) * 180 - Math.abs(normalized) * 40
         const scale = 1 - Math.abs(offset) * 0.08 - intensity * 0.03
 
-        el.style.setProperty("--rotY", `${posRotY + sRotY}deg`)
-        el.style.setProperty("--skewX", `${posSkewX + sSkewX}deg`)
+        el.style.setProperty("--rotY", `${posRotY + sRotY.pos}deg`)
+        el.style.setProperty("--skewX", `${posSkewX + sSkewX.pos}deg`)
         el.style.setProperty("--z", `${posZ}px`)
         el.style.setProperty("--scale", `${scale}`)
       }
 
       if (bg) {
-        bg.style.setProperty("--bg-skew", `${sBgSkew}deg`)
-        bg.style.setProperty("--bg-stretch", `${sBgStretch}`)
+        bg.style.setProperty("--bg-skew", `${sBgSkew.pos}deg`)
+        bg.style.setProperty("--bg-stretch", `${sBgStretch.pos}`)
       }
 
       raf = requestAnimationFrame(tick)
