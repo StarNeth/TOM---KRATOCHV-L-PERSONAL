@@ -62,6 +62,63 @@ export const Capabilities = () => {
     return () => window.removeEventListener("resize", handleResize)
   }, [])
 
+  // ── DECRYPTION SCRAMBLE ─────────────────────────────────────────────
+  // Directive: "Every content section should initialize as a [CLASSIFIED]
+  // tile that decrypts — character-by-character at ~8ms per char — as it
+  // enters the viewport." Here we scramble the section title from hex
+  // noise to the final word. No GSAP premium TextPlugin required — pure
+  // rAF + direct textContent writes, zero React re-renders per frame.
+  const titleTextRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!isMounted) return
+    const el = titleTextRef.current
+    if (!el) return
+
+    const target = t.title
+    const CHARS  = "0123456789ABCDEF!@#$%&*<>/?^~+=-|[]{}"
+    const PER_CHAR_MS = 18   // ~55 chars/s reveal — audit spec ~8ms floor
+    const WARMUP_MS   = 120  // initial full-noise chaos window
+    let raf = 0
+    let start = 0
+
+    const tick = (now: number) => {
+      if (!start) start = now
+      const elapsed = now - start
+      let out = ""
+      for (let i = 0; i < target.length; i++) {
+        // Each character locks at WARMUP + i * PER_CHAR
+        if (elapsed >= WARMUP_MS + i * PER_CHAR_MS) out += target[i]
+        else if (target[i] === " ") out += " "
+        else out += CHARS[Math.floor(Math.random() * CHARS.length)]
+      }
+      el.textContent = out
+      if (elapsed < WARMUP_MS + target.length * PER_CHAR_MS + 40) {
+        raf = requestAnimationFrame(tick)
+      } else {
+        el.textContent = target
+      }
+    }
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (entry?.isIntersecting) {
+          raf = requestAnimationFrame(tick)
+          obs.disconnect()
+        }
+      },
+      { threshold: 0.25 }
+    )
+    if (sectionRef.current) obs.observe(sectionRef.current)
+
+    return () => {
+      cancelAnimationFrame(raf)
+      obs.disconnect()
+      if (el) el.textContent = target
+    }
+  }, [isMounted, t.title])
+
   useGSAP(
     () => {
       if (!isMounted) return
@@ -234,7 +291,15 @@ export const Capabilities = () => {
     >
       <div className="cap-title relative md:absolute md:inset-0 flex items-center justify-center pointer-events-none z-10 px-4 mb-12 md:mb-0 w-full overflow-hidden md:overflow-visible">
         <h2 className="font-sans font-black text-[clamp(2.5rem,14vw,16rem)] uppercase tracking-[-0.05em] leading-[0.82] text-white/50 md:text-white/8 mix-blend-normal whitespace-nowrap w-full text-center">
-          {t.title}
+          {/* textContent is imperatively swapped by the decryption scramble.
+              `font-variant-numeric: tabular-nums` + the hex glyph palette
+              keeps the word width stable during the chaos window. */}
+          <span
+            ref={titleTextRef}
+            style={{ fontVariantNumeric: "tabular-nums", display: "inline-block" }}
+          >
+            {t.title}
+          </span>
         </h2>
       </div>
 
