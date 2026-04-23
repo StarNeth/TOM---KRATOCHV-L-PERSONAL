@@ -119,14 +119,14 @@ const CAST_IRON_STRETCH: SpringConfig = {
 
 const stepSpring = (s: SpringState, target: number, dt: number, cfg: SpringConfig = CAST_IRON) => {
   const error = target - s.pos
-  // Velocity-signed regime detection.
-  // (error, vel) same sign → mass moving toward target → ACCELERATING.
-  // (error, vel) opposite  → mass has overshot            → RECOVERING.
   const accelerating = Math.sign(error) === Math.sign(s.vel) || Math.abs(s.vel) < 1e-3
   const k = accelerating ? cfg.kAccel : cfg.kRec
   const b = accelerating ? cfg.bAccel : cfg.bRec
-  // Semi-implicit Euler — stable at 120Hz, causally correct.
-  s.vel += (k * error - b * s.vel) * dt
+  
+  // ZMĚNĚNO: Framerate-independent damping via exact exponential decay.
+  // Prevents the "concrete slab" stiffness on mobile CPU frame drops.
+  s.vel += (k * error) * dt
+  s.vel *= Math.exp(-b * dt)
   s.pos += s.vel * dt
   return s.pos
 }
@@ -213,11 +213,6 @@ export const Projects = () => {
     const hudDepths = hudDepthRefs.current
     const hudVels = hudVelRefs.current
 
-    // Detect once at loop start — window.innerWidth doesn't change mid-loop.
-    // 768px breakpoint matches the md: Tailwind breakpoint used throughout.
-    // Re-evaluated on resize via the visibility gate (IO fires on re-entry).
-    const isMobileViewport = window.innerWidth < 768
-
     const sRotY:      SpringState = { pos: 0, vel: 0 }
     const sSkewX:     SpringState = { pos: 0, vel: 0 }
     const sBgSkew:    SpringState = { pos: 0, vel: 0 }
@@ -242,6 +237,7 @@ export const Projects = () => {
       stepSpring(sBgStretch, tBgStretch, dt, CAST_IRON_STRETCH)
 
       const vw             = window.innerWidth
+      const isMobileViewport = vw < 768  // ZMĚNĚNO: Re-evaluated every frame dynamically
       const viewportCenter = vw / 2
       const span           = vw * 0.65
 

@@ -333,12 +333,13 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       float d  = (NdotH * NdotH) * (a2 - 1.0) + 1.0;
       return a2 / (PI * d * d + 1e-5);
     }
-    float G_Smith(float NdotV, float NdotL, float rough) {
-      float r = rough + 1.0;
-      float k = (r * r) * 0.125;
-      float gV = NdotV / (NdotV * (1.0 - k) + k + 1e-5);
-      float gL = NdotL / (NdotL * (1.0 - k) + k + 1e-5);
-      return gV * gL;
+    // Height-Correlated Smith G2 Visibility Function
+    // V = G2 / (4 * NdotL * NdotV)
+    float V_SmithCorrelated(float NdotV, float NdotL, float alpha) {
+      float a2 = alpha * alpha;
+      float lambdaV = NdotL * sqrt((-NdotV * a2 + NdotV) * NdotV + a2);
+      float lambdaL = NdotV * sqrt((-NdotL * a2 + NdotL) * NdotL + a2);
+      return 0.5 / (lambdaV + lambdaL + 1e-5);
     }
     vec3 F_Schlick(vec3 F0, float cosT) {
       return F0 + (1.0 - F0) * pow(1.0 - cosT, 5.0);
@@ -386,9 +387,13 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       float roughness = mix(0.38, 0.12, ridge);
 
       float D = D_GGX(NdotH, roughness);
-      float G = G_Smith(NdotV, NdotL, roughness);
+      // ZMĚNĚNO: Voláme novou, výškově korelující Visibility funkci
+      float V_vis = V_SmithCorrelated(NdotV, NdotL, roughness);
       vec3  F = F_Schlick(F0, VdotH);
-      vec3 specular = (D * G) * F / max(4.0 * NdotV * NdotL, 1e-3);
+      
+      // ZMĚNĚNO: V_vis v sobě už má integrované dělení (4 * NdotV * NdotL),
+      // takže rovnice se radikálně zjednoduší na D * V * F.
+      vec3 specular = D * V_vis * F;
 
       vec3 lit = body * ao + specular * NdotL * 1.35 + ridgeEmit;
 
