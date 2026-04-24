@@ -162,6 +162,18 @@ export const Projects = () => {
   const glitchTimelines = useRef<Map<number, gsap.core.Timeline>>(new Map())
 
   const [isVisible, setIsVisible] = useState(false)
+  
+  // ZMĚNĚNO: Asynchronní sledování viewportu bez blokování hlavního vlákna
+  const [vw, setVw] = useState(() => typeof window !== "undefined" ? window.innerWidth : 1200)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const ro = new ResizeObserver((entries) => {
+      setVw(entries[0].contentRect.width)
+    })
+    ro.observe(document.documentElement)
+    return () => ro.disconnect()
+  }, [])
 
   // Horizontal scroll pin — the velocity bus owns all kinetic math.
   useGSAP(
@@ -213,6 +225,9 @@ export const Projects = () => {
     const hudDepths = hudDepthRefs.current
     const hudVels = hudVelRefs.current
 
+    // ZMĚNĚNO: Čteme šířku z asynchronního stavu, mimo rAF tick.
+    const isMobileViewport = vw < 768
+
     const sRotY:      SpringState = { pos: 0, vel: 0 }
     const sSkewX:     SpringState = { pos: 0, vel: 0 }
     const sBgSkew:    SpringState = { pos: 0, vel: 0 }
@@ -236,8 +251,8 @@ export const Projects = () => {
       stepSpring(sBgSkew,    tBgSkew,    dt)
       stepSpring(sBgStretch, tBgStretch, dt, CAST_IRON_STRETCH)
 
-      const vw             = window.innerWidth
-      const isMobileViewport = vw < 768  // ZMĚNĚNO: Re-evaluated every frame dynamically
+      // ZMĚNĚNO: Odstraněno window.innerWidth (synchronous layout query). 
+      // Využíváme 'vw' z closure aktualizované ResizeObserverem.
       const viewportCenter = vw / 2
       const span           = vw * 0.65
 

@@ -350,20 +350,12 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       float h, float ridge, vec3 floorCol, vec3 peakCol,
       vec3 N, float ao
     ) {
-      // 1. Body — crushed height → vast dark floor
-      #if IS_MOBILE == 1
-      float crushed = pow(h, 4.2);
-      #else
+      // ZMĚNĚNO: Návrat k čisté fyzice pro všechny platformy.
       float crushed = pow(h, 5.0);
-      #endif
       vec3 body = mix(floorCol, peakCol, crushed * 0.35);
 
-      // 2. Ridge energy — PRIMARY over-exposure vector.
-      #if IS_MOBILE == 1
-      float ridgeEnergy = 0.72 + uIntensity * 0.35;
-      #else
+      // ZMĚNĚNO: Ridge energy je konzistentní všude. Expozici snížíme až na konci.
       float ridgeEnergy = 1.6 + uIntensity * 1.4;
-      #endif
       vec3 ridgeEmit = peakCol * ridge * ridgeEnergy;
 
       // 3. GGX specular — synthetic light drift on mobile (unchanged, correct)
@@ -404,6 +396,9 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       float iridGate = clamp((ridge - 0.55) / 0.45, 0.0, 1.0);
       lit += iridescent * 0.035 * iridGate;
       lit += vec3(0.004, 0.005, 0.009) * (1.0 - ao) * 0.3;
+      
+      // ZMĚNĚNO: Korekce expozice pro mobilní obrazovky (zachovává fyzikální křivky, tlumí světlo)
+      lit *= 0.65;
       #endif
 
       float dimming = mix(1.0, 0.4, smoothstep(0.85, 1.0, uScrollProgress));
