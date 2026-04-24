@@ -108,10 +108,11 @@ import { cursorBus } from "@/lib/cursor-bus"
 type LiquidProps = { isMobile: boolean; onFirstFrame: () => void }
 
 const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
-  const materialRef   = useRef<THREE.ShaderMaterial>(null)
-  const targetMouse   = useRef(new THREE.Vector2(0, 0))
-  const firedRef      = useRef(false)
-  const turbulenceRef = useRef({ value: 0, target: 0, peakAt: 0 })
+  const materialRef    = useRef<THREE.ShaderMaterial>(null)
+  const targetMouse    = useRef(new THREE.Vector2(0, 0))
+  const firedRef       = useRef(false)
+  const turbulenceRef  = useRef({ value: 0, target: 0, peakAt: 0 })
+  const clickTweenRef  = useRef<gsap.core.Tween | null>(null)
   const dpr = isMobile ? 1 : 1.5
 
   useEffect(() => {
@@ -142,7 +143,8 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       const cx =  (ev.detail.x / window.innerWidth)  * 2 - 1
       const cy = -(ev.detail.y / window.innerHeight) * 2 + 1
       materialRef.current.uniforms.uClickPos.value.set(cx, cy)
-      gsap.fromTo(
+      clickTweenRef.current?.kill()
+      clickTweenRef.current = gsap.fromTo(
         materialRef.current.uniforms.uClickRipple,
         { value: 0.0 },
         {
@@ -175,7 +177,10 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       window.removeEventListener("resize", onResize)
       window.removeEventListener("webgl-shoot", onShoot as EventListener)
       window.removeEventListener("webgl-transition", onTransition as EventListener)
-      if (!isMobile) window.removeEventListener("mousemove", onMouse)
+      if (!isMobile)
+        window.removeEventListener("mousemove", onMouse)
+      clickTweenRef.current?.kill()
+      clickTweenRef.current = null
     }
   }, [isMobile, dpr])
 
@@ -482,12 +487,13 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       vec3 N  = normalize(vec3(-dH * 3.5, 1.0));
 
       // ── SECONDARY NORMAL LAYER — low-frequency "deep churn" ─────────
-      // ZMĚNĚNO: Optimalizace přes screen-space derivace (dFdx/dFdy) sjednocuje
-      // souřadnicové systémy a šetří 2 vnoise vzorky na pixel.
       #if IS_MOBILE == 0
       float deepChurn = vnoise(p * 0.35 + uTime * 0.015);
-      vec2  deepGrad  = vec2(dFdx(deepChurn), dFdy(deepChurn));
-      N = normalize(N + vec3(-deepGrad * 0.9, 0.0));
+      vec2  deepGrad  = vec2(
+        vnoise(p * 0.35 + vec2(0.01, 0.0) + uTime * 0.015) - deepChurn,
+        vnoise(p * 0.35 + vec2(0.0, 0.01) + uTime * 0.015) - deepChurn
+      ) * 100.0;
+      N = normalize(N + vec3(deepGrad * 0.12, 0.0));
       #endif
 
       // ── AMBIENT OCCLUSION (noise gradient derived) ──────────────────
@@ -710,21 +716,14 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
           camera={{ position: [0, 0, 1], left: -1, right: 1, top: 1, bottom: -1 }}
           dpr={isMobile ? 1 : 1.5}
           gl={{
-            // ── REGRESSION 01 FIX — mobile GL option softening ──────────
-            // powerPreference: "default" on mobile — the OS driver can
-            // manage clocks/thermals. "high-performance" drains the budget
-            // in <30s on iOS and causes OS-level context kills.
             powerPreference: isMobile ? "default" : "high-performance",
             alpha: false,
             antialias: !isMobile,
             stencil: false,
             depth: false,
-            // failIfMajorPerformanceCaveat intentionally absent on mobile.
-            // iOS Safari returns null from getContext() on any throttled
-            // session — R3F then throws synchronously and Next.js reports
-            // it as a page-level failure ("This page couldn't load").
-            // Desktop keeps the quality gate; mobile accepts any context.
-            ...(isMobile ? {} : { failIfMajorPerformanceCaveat: true }),
+            // ZMĚNĚNO: failIfMajorPerformanceCaveat kompletně odstraněno.
+            // Zabraňuje fatálním pádům (GL_VENDOR = Disabled) během HMR vývoje 
+            // a na počítačích s dočasně přetíženou grafikou.
           }}
           onCreated={handleCreated}
         >

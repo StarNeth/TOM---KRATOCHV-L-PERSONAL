@@ -488,6 +488,11 @@ export const Projects = () => {
         timelines.forEach((tl) => tl.kill())
         timelines.clear()
         removers.forEach((fn) => fn())
+        // Kill any one-shot tweens created imperatively in event handlers.
+        // These are outside the useGSAP context scope and are not auto-reverted.
+        imgWrapRefs.current.forEach((el) => el && gsap.killTweensOf(el))
+        chromaRRefs.current.forEach((el) => el && gsap.killTweensOf(el))
+        chromaCRefs.current.forEach((el) => el && gsap.killTweensOf(el))
       }
     },
     { scope: containerRef },
@@ -497,7 +502,7 @@ export const Projects = () => {
     <section
       ref={containerRef}
       id="work"
-      className="relative w-full h-[100vh] bg-transparent perspective-[2200px] overflow-hidden"
+      className="relative w-full h-[100svh] bg-transparent perspective-[2200px] overflow-hidden"
     >
       <div
         ref={bgWordRef}

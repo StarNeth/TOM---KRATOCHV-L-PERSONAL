@@ -159,7 +159,9 @@ export const Preloader = () => {
   const completedRef = useRef(false)
   const isBotRef = useRef(false)
   const reducedMotionRef = useRef(false)
-  const tlRef = useRef<gsap.core.Timeline | null>(null)
+  const tlRef       = useRef<gsap.core.Timeline | null>(null)
+  const pollRafRef  = useRef(0)
+  const pollAborted = useRef(false)
 
   const [done, setDone] = useState(false)
 
@@ -409,14 +411,15 @@ export const Preloader = () => {
       if (webglReady) { commitFinish(); return }
       const start = performance.now()
       const poll = () => {
+        if (pollAborted.current) return
         if (webglReady || performance.now() - start > WEBGL_POLL_TIMEOUT) {
           window.removeEventListener("webgl-first-frame", onWebGLFirstFrame)
           commitFinish()
           return
         }
-        requestAnimationFrame(poll)
+        pollRafRef.current = requestAnimationFrame(poll)
       }
-      requestAnimationFrame(poll)
+      pollRafRef.current = requestAnimationFrame(poll)
     }
 
     if (isBotRef.current) {
@@ -603,6 +606,8 @@ export const Preloader = () => {
 
   useEffect(() => {
     return () => {
+      pollAborted.current = true
+      cancelAnimationFrame(pollRafRef.current)
       if (tlRef.current) {
         tlRef.current.kill()
         tlRef.current = null
