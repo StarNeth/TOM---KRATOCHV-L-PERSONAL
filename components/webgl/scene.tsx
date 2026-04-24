@@ -387,6 +387,8 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       // takže rovnice se radikálně zjednoduší na D * V * F.
       vec3 specular = D * V_vis * F;
 
+      // ZMĚNĚNO (Dokumentace): x1.35 na specular je umělecký záměr, nikoliv 
+      // pokus o striktní energetickou konzervaci, kompenzuje absenci IBL.
       vec3 lit = body * ao + specular * NdotL * 1.35 + ridgeEmit;
 
       // 4. Iridescent ambient — RECALIBRATED.
@@ -480,16 +482,12 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       vec3 N  = normalize(vec3(-dH * 3.5, 1.0));
 
       // ── SECONDARY NORMAL LAYER — low-frequency "deep churn" ─────────
-      // Audit fix: "true volumetric fluid requires a secondary normal-map
-      // layer driven by a slower, lower-frequency FBM octave." 1 extra
-      // vnoise — ~4% shader cost — for dramatic perceptual depth gain.
+      // ZMĚNĚNO: Optimalizace přes screen-space derivace (dFdx/dFdy) sjednocuje
+      // souřadnicové systémy a šetří 2 vnoise vzorky na pixel.
       #if IS_MOBILE == 0
       float deepChurn = vnoise(p * 0.35 + uTime * 0.015);
-      vec2  deepGrad  = vec2(
-        vnoise(p * 0.35 + vec2(0.01, 0.0) + uTime * 0.015) - deepChurn,
-        vnoise(p * 0.35 + vec2(0.0, 0.01) + uTime * 0.015) - deepChurn
-      ) * 100.0;
-      N = normalize(N + vec3(deepGrad * 0.12, 0.0));
+      vec2  deepGrad  = vec2(dFdx(deepChurn), dFdy(deepChurn));
+      N = normalize(N + vec3(-deepGrad * 0.9, 0.0));
       #endif
 
       // ── AMBIENT OCCLUSION (noise gradient derived) ──────────────────

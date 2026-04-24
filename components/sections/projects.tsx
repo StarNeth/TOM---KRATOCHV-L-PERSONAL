@@ -162,14 +162,16 @@ export const Projects = () => {
   const glitchTimelines = useRef<Map<number, gsap.core.Timeline>>(new Map())
 
   const [isVisible, setIsVisible] = useState(false)
-  
-  // ZMĚNĚNO: Asynchronní sledování viewportu bez blokování hlavního vlákna
-  const [vw, setVw] = useState(() => typeof window !== "undefined" ? window.innerWidth : 1200)
+
+  // ZMĚNĚNO: Ref-based tracking to avoid stale closures in the rAF loop
+  const vwRef = useRef(typeof window !== "undefined" ? window.innerWidth : 1200)
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    const ro = new ResizeObserver((entries) => {
-      setVw(entries[0].contentRect.width)
+    const ro = new ResizeObserver(() => {
+      // Zapisujeme přímo do refu (ne do state) a používáme innerWidth 
+      // kvůli přesnosti oproti contentRect (vyhýbá se driftu od scrollbaru).
+      vwRef.current = window.innerWidth
     })
     ro.observe(document.documentElement)
     return () => ro.disconnect()
@@ -225,9 +227,6 @@ export const Projects = () => {
     const hudDepths = hudDepthRefs.current
     const hudVels = hudVelRefs.current
 
-    // ZMĚNĚNO: Čteme šířku z asynchronního stavu, mimo rAF tick.
-    const isMobileViewport = vw < 768
-
     const sRotY:      SpringState = { pos: 0, vel: 0 }
     const sSkewX:     SpringState = { pos: 0, vel: 0 }
     const sBgSkew:    SpringState = { pos: 0, vel: 0 }
@@ -251,10 +250,12 @@ export const Projects = () => {
       stepSpring(sBgSkew,    tBgSkew,    dt)
       stepSpring(sBgStretch, tBgStretch, dt, CAST_IRON_STRETCH)
 
-      // ZMĚNĚNO: Odstraněno window.innerWidth (synchronous layout query). 
-      // Využíváme 'vw' z closure aktualizované ResizeObserverem.
-      const viewportCenter = vw / 2
-      const span           = vw * 0.65
+      // ZMĚNĚNO: vw se čte živě z refu v každém framu. Tím padá problém se Stale Closure.
+      const currentVw = vwRef.current
+      const isMobileViewport = currentVw < 768
+
+      const viewportCenter = currentVw / 2
+      const span           = currentVw * 0.65
 
       for (let i = 0; i < cards.length; i++) {
         const el = cards[i]
