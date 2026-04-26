@@ -548,16 +548,22 @@ export const Preloader = () => {
 
     tl.to({}, { duration: 0.1 })
 
-    // ── ACT IV — MATERIALIZATION (pixel positions) ─────────────────────
+    // ── ACT IV — MATERIALIZATION (clip-path reveal) ────────────────────
+    // The previous brightness/blur flash read as a flashbulb — a generic
+    // "thing arriving with a glow." This rewrite uses a pure clip-path
+    // on each letter: a horizontal slit at the vertical midline opens to
+    // full inset(0). The form materializes by being uncovered, not by
+    // being lit. Same 0.75s cinematic duration; the silhouette emerges
+    // edge-first instead of bloom-first.
     tl.fromTo(letterTRef.current,
-      { x: -POS_ENTER, scale: 0.88, opacity: 0, filter: "brightness(12) blur(24px)" },
-      { x: -POS_ENTER, scale: 1,    opacity: 1, filter: "brightness(1) blur(0px)",
+      { x: -POS_ENTER, scale: 0.88, opacity: 0, clipPath: "inset(50% 0% 50% 0%)" },
+      { x: -POS_ENTER, scale: 1,    opacity: 1, clipPath: "inset(0% 0% 0% 0%)",
         duration: 0.75, ease: "expo.out" },
       ">-0.08"
     )
     tl.fromTo(letterKRef.current,
-      { x:  POS_ENTER, scale: 0.88, opacity: 0, filter: "brightness(12) blur(24px)" },
-      { x:  POS_ENTER, scale: 1,    opacity: 1, filter: "brightness(1) blur(0px)",
+      { x:  POS_ENTER, scale: 0.88, opacity: 0, clipPath: "inset(50% 0% 50% 0%)" },
+      { x:  POS_ENTER, scale: 1,    opacity: 1, clipPath: "inset(0% 0% 0% 0%)",
         duration: 0.75, ease: "expo.out" },
       "<"
     )
@@ -598,8 +604,10 @@ export const Preloader = () => {
   }, [announce, particles])
 
   useEffect(() => {
-    if (letterTRef.current) gsap.set(letterTRef.current, { opacity: 0, x: 0, scale: 0.88 })
-    if (letterKRef.current) gsap.set(letterKRef.current, { opacity: 0, x: 0, scale: 0.88 })
+    // Initial state — letters start hidden behind a closed slit.
+    // Act IV opens it; nothing else in the timeline writes clipPath.
+    if (letterTRef.current) gsap.set(letterTRef.current, { opacity: 0, x: 0, scale: 0.88, clipPath: "inset(50% 0% 50% 0%)" })
+    if (letterKRef.current) gsap.set(letterKRef.current, { opacity: 0, x: 0, scale: 0.88, clipPath: "inset(50% 0% 50% 0%)" })
     const shards = shardContainerRef.current?.querySelectorAll(".pp-shard")
     if (shards) gsap.set(shards, { opacity: 0, x: 0, y: 0, rotation: 0, scale: 1 })
   }, [])
@@ -625,10 +633,113 @@ export const Preloader = () => {
           __html: `if(typeof sessionStorage !== 'undefined' && sessionStorage.getItem('preloader_played')) { document.documentElement.classList.add('skip-preloader'); }`,
         }}
       />
-      <style suppressHydrationWarning>{`.skip-preloader #nuclear-preloader { display: none !important; }`}</style>
+      <style suppressHydrationWarning>{`
+        .skip-preloader #nuclear-preloader { display: none !important; }
+
+        /*
+         * Coordinate-system precursor — a 300ms shape-sketch that boots
+         * the eye into the instrument's reading frame. The element ends
+         * with display:none (forwards) so it cannot intercept pointer
+         * events later. Reduced motion still gets the static frame for
+         * the same 300ms — no animation, just a hold-and-cut.
+         */
+        .precursor-frame {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 101;
+          color: rgba(255, 255, 255, 0.55);
+          animation: precursor-show 300ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          will-change: opacity;
+        }
+        @keyframes precursor-show {
+          0%   { opacity: 0; }
+          25%  { opacity: 1; }
+          70%  { opacity: 1; }
+          100% { opacity: 0; visibility: hidden; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .precursor-frame {
+            animation: precursor-show-static 300ms steps(2, jump-end) forwards;
+          }
+          @keyframes precursor-show-static {
+            0%, 99% { opacity: 1; }
+            100%    { opacity: 0; visibility: hidden; }
+          }
+        }
+        .precursor-line {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          background: currentColor;
+          transform-origin: center;
+        }
+        .precursor-h {
+          width: 100vw;
+          height: 1px;
+          transform: translate(-50%, -50%);
+        }
+        .precursor-v {
+          width: 1px;
+          height: 100vh;
+          transform: translate(-50%, -50%);
+        }
+        .precursor-ring {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          border: 1px solid currentColor;
+          border-radius: 50%;
+          transform: translate(-50%, -50%);
+        }
+        .precursor-ring--1 { width: 96px;  height: 96px;  }
+        .precursor-ring--2 { width: 240px; height: 240px; }
+        .precursor-ring--3 { width: 480px; height: 480px; }
+        .precursor-tick {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 1px;
+          height: 14px;
+          background: currentColor;
+        }
+        /* The three radial ticks sit at the outermost ring's perimeter
+           (radius 240px). N, E, and W — three of four cardinals, the
+           asymmetry chosen so the shape never resolves into a clock. */
+        .precursor-tick--n { transform: translate(-50%, calc(-240px - 7px)); }
+        .precursor-tick--e {
+          transform: translate(calc(240px - 0.5px), -50%) rotate(90deg);
+          transform-origin: center;
+        }
+        .precursor-tick--w {
+          transform: translate(calc(-240px - 0.5px), -50%) rotate(90deg);
+          transform-origin: center;
+        }
+      `}</style>
 
       <div id="nuclear-preloader" ref={rootRef} className="fixed inset-0 z-[100] pointer-events-none" aria-hidden="true">
         <div ref={liveRef} role="status" aria-live="polite" aria-atomic="true" className="sr-only" />
+
+        {/*
+          ── COORDINATE-SYSTEM PRECURSOR (300ms) ────────────────────────
+          A diagnostic crosshair the instrument throws up before the
+          counter takes over. Eight strokes: a horizontal centerline,
+          a vertical centerline, three concentric rings, and three short
+          radial ticks at the outer ring (N, E, W). Pure CSS, aria-hidden;
+          GSAP timeline does not touch it. After 300ms it removes itself
+          and never returns.
+          ──────────────────────────────────────────────────────────────
+        */}
+        <div className="precursor-frame" aria-hidden="true">
+          <span className="precursor-line precursor-h" />
+          <span className="precursor-line precursor-v" />
+          <span className="precursor-ring precursor-ring--1" />
+          <span className="precursor-ring precursor-ring--2" />
+          <span className="precursor-ring precursor-ring--3" />
+          <span className="precursor-tick precursor-tick--n" />
+          <span className="precursor-tick precursor-tick--e" />
+          <span className="precursor-tick precursor-tick--w" />
+        </div>
 
         <div
           ref={stageRef}
