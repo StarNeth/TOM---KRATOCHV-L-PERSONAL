@@ -9,6 +9,7 @@ import Image from "next/image"
 import { useLanguage } from "@/components/navigation/language-toggle"
 import { ease } from "@/lib/easing"
 import { velocityBus } from "@/lib/velocity-bus"
+import { coreStateBus } from "@/lib/core-state-bus"
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger)
@@ -16,13 +17,16 @@ if (typeof window !== "undefined") {
 }
 
 const DICTIONARY = {
-  en: { titlePart1: "Digital", titlePart2: "Architectures.", label: "Selected · 2024—2026" },
-  cs: { titlePart1: "Digitální", titlePart2: "Architektury.", label: "Vybrané · 2024—2026" },
+  en: { titlePart1: "Digital", titlePart2: "Architectures.", label: "Selected · 2024—2026", scrollHint: "Scroll →" },
+  cs: { titlePart1: "Digitální", titlePart2: "Architektury.", label: "Vybrané · 2024—2026", scrollHint: "Scrol →" },
 }
 
+// Each project carries the WebGL `zone` index that the scene's hoveredZone
+// bridge consumes. zones >= 2 are reserved for content surfaces; the scene
+// shader interprets them as palette swaps.
 const projects = [
-  { id: "01", title: "ShuXiangLou", image: "/shu-xien-glou.vercel.app_.webp", slug: "shuxianglou" },
-  { id: "02", title: "Kings Barber", image: "/kingsbarber-silk.vercel.app_.webp", slug: "kings-barber" },
+  { id: "01", title: "ShuXiangLou",  image: "/shu-xien-glou.vercel.app_.webp",   slug: "shuxianglou",  zone: 2 as const },
+  { id: "02", title: "Kings Barber", image: "/kingsbarber-silk.vercel.app_.webp", slug: "kings-barber", zone: 3 as const },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,7 +66,7 @@ const decrypt = (el: HTMLElement, finalText: string, duration = 1.2) => {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CAST-IRON ASYMMETRIC SPRING — TRUE ζ-CORRECTED PHYSICS
+// CAST-IRON ASYMMETRIC SPRING — TRUE ζ-CORRECTED PHYSICS  [INVIOLABLE]
 //
 // Damping ratio ζ = b / (2·√(k·m)) with implicit m = 1. This is the only
 // quantity that governs physical feel; raw b values are meaningless in
@@ -122,8 +126,8 @@ const stepSpring = (s: SpringState, target: number, dt: number, cfg: SpringConfi
   const accelerating = Math.sign(error) === Math.sign(s.vel) || Math.abs(s.vel) < 1e-3
   const k = accelerating ? cfg.kAccel : cfg.kRec
   const b = accelerating ? cfg.bAccel : cfg.bRec
-  
-  // ZMĚNĚNO: Framerate-independent damping via exact exponential decay.
+
+  // Framerate-independent damping via exact exponential decay.
   // Prevents the "concrete slab" stiffness on mobile CPU frame drops.
   s.vel += (k * error) * dt
   s.vel *= Math.exp(-b * dt)
@@ -147,6 +151,10 @@ export const Projects = () => {
   const chromaRRefs = useRef<HTMLDivElement[]>([])
   const chromaCRefs = useRef<HTMLDivElement[]>([])
   const gridRefs = useRef<HTMLDivElement[]>([])
+  // Scan-line element (1px rule). Idle at top with 0 opacity. On hover, a
+  // GSAP tween sweeps it from top→bottom over ~1.6s. Cancel + reverse on
+  // early mouseleave so it always retreats to its origin.
+  const scanLineRefs = useRef<HTMLDivElement[]>([])
 
   // HUD matrix readouts — pointers to the DOM text nodes that display
   // the live transform values governing each card. These are the literal
@@ -160,16 +168,18 @@ export const Projects = () => {
   // On unmount we iterate and kill — no orphaned tickers against detached
   // nodes, no `(wrap as any).glitchTl` DOM-property leak.
   const glitchTimelines = useRef<Map<number, gsap.core.Timeline>>(new Map())
+  // Same memory model for the scan-line tween, indexed per card.
+  const scanTweens = useRef<Map<number, gsap.core.Tween>>(new Map())
 
   const [isVisible, setIsVisible] = useState(false)
 
-  // ZMĚNĚNO: Ref-based tracking to avoid stale closures in the rAF loop
+  // Ref-based vw tracking to avoid stale closures in the rAF loop.
   const vwRef = useRef(typeof window !== "undefined" ? window.innerWidth : 1200)
 
   useEffect(() => {
     if (typeof window === "undefined") return
     const ro = new ResizeObserver(() => {
-      // Zapisujeme přímo do refu (ne do state) a používáme innerWidth 
+      // Zapisujeme přímo do refu (ne do state) a používáme innerWidth
       // kvůli přesnosti oproti contentRect (vyhýbá se driftu od scrollbaru).
       vwRef.current = window.innerWidth
     })
@@ -214,6 +224,7 @@ export const Projects = () => {
 
   // ───────────────────────────────────────────────────────────────────────────
   // SINGLE rAF LOOP — CACHED REFS + ASYMMETRIC SPRING + CAUSAL DENSITY
+  // [INVIOLABLE — physics & cadence preserved verbatim]
   // ───────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isVisible) return
@@ -250,7 +261,7 @@ export const Projects = () => {
       stepSpring(sBgSkew,    tBgSkew,    dt)
       stepSpring(sBgStretch, tBgStretch, dt, CAST_IRON_STRETCH)
 
-      // ZMĚNĚNO: vw se čte živě z refu v každém framu. Tím padá problém se Stale Closure.
+      // vw se čte živě z refu v každém framu. Tím padá problém se Stale Closure.
       const currentVw = vwRef.current
       const isMobileViewport = currentVw < 768
 
@@ -285,14 +296,13 @@ export const Projects = () => {
           // heavy repaints and layout recalculations (saving ~8-14ms/frame).
           const grid = grids[i]
           if (grid) {
-            grid.style.opacity = `${intensity * 0.18}`
+            grid.style.opacity = `${intensity * 0.12}`
             grid.style.setProperty("--grid-size", `${24 - intensity * 8}px`)
           }
 
           const link = links[i]
           if (link) {
-            link.style.setProperty("--border-opacity", `${0.1 + intensity * 0.55}`)
-            link.style.setProperty("--border-glow",    `${intensity * 28}px`)
+            link.style.setProperty("--border-opacity", `${0.18 + intensity * 0.55}`)
           }
 
           const hr = hudRotYs[i]
@@ -381,16 +391,26 @@ export const Projects = () => {
   )
 
   // ───────────────────────────────────────────────────────────────────────────
-  // MEMORY-SAFE RGB SPLIT GLITCH + SLOW ZOOM
+  // MEMORY-SAFE RGB SPLIT GLITCH + SLOW ZOOM + SCAN-LINE SWEEP + ZONE BUS
   //
-  // Timelines are stored in `glitchTimelines` (a Map<index, Timeline> ref).
-  // On unmount we iterate the map and kill each timeline — no orphaned
-  // GSAP tickers against detached DOM, no properties stashed on elements.
+  // Hover responsibilities (in order, all on the SAME mouseenter event):
+  //   1. coreStateBus.set({ hoveredZone: project.zone }) — informs the
+  //      WebGL scene to swap palette via its bus bridge.
+  //   2. Slow high-tension zoom — the dread build (existing behavior).
+  //   3. Repeating RGB-split chroma break (existing behavior).
+  //   4. NEW: 1px rule sweeps top→bottom over 1.6s, ONCE per hover.
+  //      mouseleave kills the tween mid-flight via gsap.killTweensOf so an
+  //      early leave smoothly retreats to the origin (opacity 0, top: 0).
+  //
+  // Timelines / tweens are stored in WeakRef-friendly Maps keyed by card
+  // index. On unmount we iterate and kill — no orphaned GSAP tickers
+  // against detached DOM, no properties stashed on elements.
   // ───────────────────────────────────────────────────────────────────────────
   useGSAP(
     () => {
       const removers: Array<() => void> = []
       const timelines = glitchTimelines.current
+      const scans = scanTweens.current
 
       cardRefs.current.forEach((card, i) => {
         if (!card) return
@@ -398,9 +418,14 @@ export const Projects = () => {
         const wrap = imgWrapRefs.current[i]
         const cR = chromaRRefs.current[i]
         const cC = chromaCRefs.current[i]
+        const scan = scanLineRefs.current[i]
         if (!link || !wrap) return
 
         const onEnter = () => {
+          // Inform the WebGL scene of the project zone — drives palette
+          // bias via the additive coreStateBus → uZoneOverride bridge.
+          coreStateBus.set({ hoveredZone: projects[i].zone })
+
           const targets = [wrap, cR, cC].filter(Boolean) as Element[]
           gsap.killTweensOf(targets)
 
@@ -414,42 +439,46 @@ export const Projects = () => {
 
             const tl = gsap.timeline({ repeat: -1, repeatDelay: 2.2 })
             tl.set([cR, cC], { opacity: 0.9 })
-              .to(
-                cR,
-                {
-                  x: () => gsap.utils.random(-8, 8),
-                  y: () => gsap.utils.random(-4, 4),
-                  duration: 0.04,
-                  ease: "steps(1)",
-                },
-              )
-              .to(
-                cC,
-                {
-                  x: () => gsap.utils.random(-8, 8),
-                  y: () => gsap.utils.random(-4, 4),
-                  duration: 0.04,
-                  ease: "steps(1)",
-                },
-                "<",
-              )
-              .to(
-                wrap,
-                {
-                  x: () => gsap.utils.random(-3, 3),
-                  duration: 0.04,
-                  ease: "steps(1)",
-                },
-                "<",
-              )
+              .to(cR, { x: () => gsap.utils.random(-8, 8), y: () => gsap.utils.random(-4, 4), duration: 0.04, ease: "steps(1)" })
+              .to(cC, { x: () => gsap.utils.random(-8, 8), y: () => gsap.utils.random(-4, 4), duration: 0.04, ease: "steps(1)" }, "<")
+              .to(wrap, { x: () => gsap.utils.random(-3, 3), duration: 0.04, ease: "steps(1)" }, "<")
               .to([cR, cC], { x: 0, y: 0, opacity: 0, duration: 0.04, ease: "power2.out" })
               .to(wrap, { x: 0, duration: 0.04, ease: "power2.out" }, "<")
 
             timelines.set(i, tl)
           }
+
+          // ── SCAN-LINE SWEEP — once per hover ─────────────────────────
+          // The 1px rule is positioned absolutely at top:0. We tween its
+          // `top` from 0 → 100% across 1.6s with a steady linear curve so
+          // it reads as a CRT raster pass, not a launched object. Opacity
+          // fades up at the start and down at the end so the entry/exit
+          // doesn't pop. killTweensOf in onLeave below cancels mid-flight.
+          if (scan) {
+            scans.get(i)?.kill()
+            gsap.set(scan, { top: 0, opacity: 0 })
+            const tw = gsap.to(scan, {
+              top: "100%",
+              opacity: 0.6,
+              duration: 1.6,
+              ease: "none",
+              onComplete: () => {
+                // Wrap in a void-returning function — gsap.to() returns a
+                // Tween, which TS rejects as a Callback return type.
+                gsap.to(scan, { opacity: 0, duration: 0.18, ease: "power2.in" })
+                scans.delete(i)
+                return
+              },
+            })
+            scans.set(i, tw)
+          }
         }
 
         const onLeave = () => {
+          // Release palette bias — the bridge will smoothly retract via
+          // its own turbulence decay; no need to ramp manually.
+          coreStateBus.set({ hoveredZone: -1 })
+
           const targets = [wrap, cR, cC].filter(Boolean) as Element[]
           gsap.killTweensOf(targets)
 
@@ -458,6 +487,24 @@ export const Projects = () => {
           if (tl) {
             tl.kill()
             timelines.delete(i)
+          }
+
+          // Scan-line: cancel sweep, retreat to origin in a short reverse.
+          const sw = scans.get(i)
+          if (sw) {
+            sw.kill()
+            scans.delete(i)
+          }
+          if (scan) {
+            gsap.killTweensOf(scan)
+            gsap.to(scan, {
+              opacity: 0,
+              duration: 0.18,
+              ease: "power2.out",
+              onComplete: () => {
+                gsap.set(scan, { top: 0 })
+              },
+            })
           }
 
           gsap.to(wrap, {
@@ -483,16 +530,21 @@ export const Projects = () => {
         })
       })
 
-      // Unmount cleanup — iterate the map, kill everything, clear.
+      // Unmount cleanup — iterate the maps, kill everything, clear.
       return () => {
         timelines.forEach((tl) => tl.kill())
         timelines.clear()
+        scans.forEach((tw) => tw.kill())
+        scans.clear()
         removers.forEach((fn) => fn())
         // Kill any one-shot tweens created imperatively in event handlers.
         // These are outside the useGSAP context scope and are not auto-reverted.
         imgWrapRefs.current.forEach((el) => el && gsap.killTweensOf(el))
         chromaRRefs.current.forEach((el) => el && gsap.killTweensOf(el))
         chromaCRefs.current.forEach((el) => el && gsap.killTweensOf(el))
+        scanLineRefs.current.forEach((el) => el && gsap.killTweensOf(el))
+        // Defensive: ensure we never leave a stale hoveredZone on unmount.
+        coreStateBus.set({ hoveredZone: -1 })
       }
     },
     { scope: containerRef },
@@ -502,8 +554,11 @@ export const Projects = () => {
     <section
       ref={containerRef}
       id="work"
+      data-section="work"
       className="relative w-full h-[100svh] bg-transparent perspective-[2200px] overflow-hidden"
     >
+      {/* Background WORK/LOG ordinal — anchored at the section back, knocked
+          to 0.05 so the cards win the depth fight. */}
       <div
         ref={bgWordRef}
         aria-hidden
@@ -514,15 +569,15 @@ export const Projects = () => {
         }}
       >
         <span
-          className="font-syne font-black uppercase whitespace-nowrap tracking-[-0.06em] leading-[0.82] text-white/[0.05]"
+          className="font-syne font-black uppercase whitespace-nowrap tracking-[-0.06em] leading-[0.82] text-bone/[0.05]"
           style={{
             fontSize: "clamp(4rem, 16vw, 17rem)",
             transform: "skewY(var(--bg-skew)) scaleY(var(--bg-stretch))",
             willChange: "transform",
-            // AUDIT FIX: the 160ms CSS transition has been REMOVED.
-            // The spring IS the smoothing. Layering a linear CSS interp on
-            // top was re-smoothing the regime-switch output, blurring the
-            // cast-iron attack into the magnetic recovery. Gone.
+            // The 160ms CSS transition has been REMOVED. The spring IS the
+            // smoothing. Layering a linear CSS interp on top was re-smoothing
+            // the regime-switch output, blurring the cast-iron attack into the
+            // magnetic recovery.
           }}
         >
           WORK/LOG
@@ -533,24 +588,28 @@ export const Projects = () => {
         ref={trackRef}
         className="flex h-full items-center px-[5vw] md:px-[10vw] gap-[10vw] md:gap-[15vw] will-change-transform pr-[20vw] z-10 transform-style-3d relative"
       >
+        {/* Section title slab — left of the horizontal scroll. */}
         <div className="flex-shrink-0 w-[90vw] md:w-auto md:min-w-[45vw] relative z-20 pointer-events-none transform-gpu">
-          <span className="font-mono text-[10px] tracking-[0.5em] text-white/50 uppercase block mb-6">{t.label}</span>
+          <div className="flex items-center gap-3 mb-6 font-mono text-[10px] tracking-[0.4em] uppercase text-bone/55">
+            <span className="block h-px w-8 bg-rule-strong" />
+            <span>{t.label}</span>
+          </div>
           <h2
-            className="font-syne font-black uppercase tracking-[-0.05em] leading-[0.82] text-white drop-shadow-[0_0_40px_rgba(0,0,0,0.8)]"
+            className="font-syne font-black uppercase tracking-[-0.05em] leading-[0.82] text-bone drop-shadow-[0_0_40px_rgba(0,0,0,0.8)]"
             style={{ fontSize: "clamp(5rem, 14vw, 14rem)", fontFeatureSettings: '"ss01","ss02"' }}
           >
             <span className="block whitespace-nowrap" style={{ clipPath: "inset(0 -100vw 0 0)" }}>
               <span className="projects-title-char inline-block">{t.titlePart1}</span>
             </span>
             <span className="block whitespace-nowrap -mt-[0.08em]" style={{ clipPath: "inset(-0.15em -100vw 0 0)" }}>
-              <span className="projects-title-char inline-block font-instrument italic font-light lowercase text-white/70">
+              <span className="projects-title-char inline-block font-instrument italic font-light lowercase text-bone/70">
                 {t.titlePart2}
               </span>
             </span>
           </h2>
-          <div className="mt-8 flex items-center gap-4 font-mono text-[10px] tracking-[0.4em] uppercase text-white/40">
-            <span className="block h-px w-10 bg-white/30" />
-            <span>{"Scroll →"}</span>
+          <div className="mt-8 flex items-center gap-4 font-mono text-[10px] tracking-[0.4em] uppercase text-bone/45">
+            <span className="block h-px w-10 bg-rule-strong" />
+            <span>{t.scrollHint}</span>
           </div>
         </div>
 
@@ -578,12 +637,15 @@ export const Projects = () => {
                 transformStyle: "preserve-3d",
               }}
             >
+              {/* Background ordinal — large "01"/"02" at 0.05 opacity, set
+                  back -80px so the perspective lift reads as parallax. */}
               <div
                 className="absolute -top-8 md:-top-12 -left-2 md:-left-6 z-0 pointer-events-none hidden md:block"
                 style={{ transform: "translateZ(-80px)" }}
+                aria-hidden
               >
                 <span
-                  className="font-syne font-black uppercase tracking-[-0.04em] leading-none text-white/10"
+                  className="font-syne font-black uppercase tracking-[-0.04em] leading-none text-bone/[0.05]"
                   style={{ fontSize: "clamp(6rem, 10vw, 12rem)" }}
                 >
                   {p.id}
@@ -598,14 +660,13 @@ export const Projects = () => {
                 draggable={false}
                 aria-label={`View case study for ${p.title}`}
                 data-cursor="hover"
-                className="relative block w-full h-full rounded-xl md:rounded-[2rem] overflow-hidden bg-[#050505] pointer-events-auto cursor-pointer"
+                // Rectangular card. ZERO border radius. 1px rule that
+                // brightens with scroll velocity (--border-opacity).
+                className="relative block w-full h-full overflow-hidden bg-bg-deep pointer-events-auto cursor-pointer rounded-none"
                 style={{
-                  // Signal-strength border + glow — driven from the rAF tick.
-                  ["--border-opacity" as any]: 0.1,
-                  ["--border-glow" as any]: "0px",
-                  border: "1px solid rgba(255,255,255,var(--border-opacity, 0.1))",
-                  boxShadow:
-                    "0 40px 80px rgba(0,0,0,0.9), 0 0 var(--border-glow, 0px) rgba(255,255,255,0.35)",
+                  ["--border-opacity" as any]: 0.18,
+                  border: "1px solid color-mix(in srgb, var(--bone) calc(var(--border-opacity, 0.18) * 100%), transparent)",
+                  boxShadow: "0 40px 80px rgba(0,0,0,0.9)",
                 }}
               >
                 {/* Primary image — inside a GSAP-driven wrapper for zoom/glitch */}
@@ -663,9 +724,9 @@ export const Projects = () => {
                   }}
                 />
 
-                {/* UPGRADE 1: Velocity-driven scanline grid — opacity and
-                    spacing are written from the rAF tick. At rest, invisible.
-                    Under scroll, compresses and asserts itself. */}
+                {/* Velocity-driven scanline grid — opacity & spacing written
+                    from the rAF tick. At rest, invisible. Under scroll, it
+                    compresses and asserts itself. */}
                 <div
                   ref={(el) => {
                     if (el) gridRefs.current[index] = el
@@ -675,7 +736,7 @@ export const Projects = () => {
                   style={{
                     ["--grid-size" as any]: "24px",
                     backgroundImage:
-                      "linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)",
+                      "linear-gradient(rgba(245,243,236,0.10) 1px, transparent 1px), linear-gradient(90deg, rgba(245,243,236,0.10) 1px, transparent 1px)",
                     backgroundSize: "var(--grid-size, 24px) var(--grid-size, 24px)",
                     mixBlendMode: "overlay",
                     opacity: 0,
@@ -683,70 +744,105 @@ export const Projects = () => {
                   }}
                 />
 
-                <div className="absolute inset-0 bg-gradient-to-t from-[#020202] via-[#020202]/10 to-transparent opacity-90 pointer-events-none z-0" />
+                {/* Hover-driven scan-line — single 1px rule, sweeps top→bottom
+                    on mouseenter, retreats on mouseleave. */}
+                <div
+                  ref={(el) => {
+                    if (el) scanLineRefs.current[index] = el
+                  }}
+                  aria-hidden
+                  className="absolute left-0 right-0 z-[12] pointer-events-none"
+                  style={{
+                    top: 0,
+                    height: "1px",
+                    opacity: 0,
+                    background:
+                      "linear-gradient(90deg, transparent 0%, rgba(245,243,236,0.85) 50%, transparent 100%)",
+                    boxShadow: "0 0 12px rgba(245,243,236,0.45)",
+                    willChange: "top, opacity",
+                  }}
+                />
 
+                {/* Foot-of-image gradient veil — keeps the title legible
+                    without painting the whole card black. */}
+                <div className="absolute inset-0 bg-gradient-to-t from-bg-deep via-bg-deep/15 to-transparent opacity-90 pointer-events-none z-0" />
+
+                {/* Top-left case index — bracket-cornered chip. */}
                 <div className="absolute top-6 left-6 md:top-10 md:left-10 z-20 pointer-events-none">
-                  <span className="font-mono text-[9px] tracking-[0.4em] text-white/50 uppercase">
-                    {p.id} · CASE
-                  </span>
+                  <div className="relative inline-flex items-center gap-2 font-mono text-[9px] tracking-[0.4em] text-bone/65 uppercase px-2 py-1">
+                    <span aria-hidden className="absolute -left-px -top-px w-2 h-2 border-l border-t border-rule-strong" />
+                    <span aria-hidden className="absolute -right-px -bottom-px w-2 h-2 border-r border-b border-rule-strong" />
+                    <span>{p.id}</span>
+                    <span className="block w-2 h-px bg-rule-strong" />
+                    <span>CASE</span>
+                  </div>
                 </div>
 
-                {/* UPGRADE 2: PERSPECTIVE · RENDER · MATRIX HUD.
-                    Text nodes are written every frame from the exact values
-                    driving rotateY/skewX/translateZ. The label and the
-                    geometry share one source of truth. */}
+                {/* PERSPECTIVE · RENDER · MATRIX HUD — text nodes are written
+                    every frame from the exact values driving the transform.
+                    The label and the geometry share one source of truth.
+                    PBR/GGX row is static — declarative shading model badge. */}
                 <div
-                  className="absolute top-6 right-6 md:top-10 md:right-10 z-20 pointer-events-none font-mono text-[9px] tracking-[0.2em] uppercase text-white/70 backdrop-blur-sm bg-black/30 border border-white/10 px-3 py-2 rounded-sm"
+                  className="absolute top-6 right-6 md:top-10 md:right-10 z-20 pointer-events-none font-mono text-[9px] tracking-[0.18em] uppercase text-bone/85 backdrop-blur-sm bg-bg-deep/55 border border-rule px-3 py-2 rounded-none"
                   style={{ fontVariantNumeric: "tabular-nums" }}
                   aria-hidden
                 >
-                  <div className="text-white/40 mb-1.5">PROJ · RENDER · MATRIX</div>
+                  <div className="flex items-center justify-between gap-3 text-bone/45 mb-1.5">
+                    <span>PROJ · RENDER · MATRIX</span>
+                    <span className="block w-1.5 h-1.5 bg-amber" style={{ boxShadow: "0 0 6px var(--amber)" }} />
+                  </div>
                   <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
-                    <span className="text-white/40">ROT_Y</span>
+                    <span className="text-bone/50">ROT_Y</span>
                     <span
                       ref={(el) => {
                         if (el) hudRotYRefs.current[index] = el
                       }}
-                      className="text-right text-white"
+                      className="text-right text-bone"
                     >
                       0.00°
                     </span>
-                    <span className="text-white/40">SKEW_X</span>
+                    <span className="text-bone/50">SKEW_X</span>
                     <span
                       ref={(el) => {
                         if (el) hudSkewRefs.current[index] = el
                       }}
-                      className="text-right text-white"
+                      className="text-right text-bone"
                     >
                       0.00°
                     </span>
-                    <span className="text-white/40">Z_DEPTH</span>
+                    <span className="text-bone/50">Z_DEPTH</span>
                     <span
                       ref={(el) => {
                         if (el) hudDepthRefs.current[index] = el
                       }}
-                      className="text-right text-white"
+                      className="text-right text-bone"
                     >
                       0.0z
                     </span>
-                    <span className="text-white/40">VEL</span>
+                    <span className="text-bone/50">VEL</span>
                     <span
                       ref={(el) => {
                         if (el) hudVelRefs.current[index] = el
                       }}
-                      className="text-right text-white"
+                      className="text-right text-bone"
                     >
                       0%
                     </span>
+                    {/* PBR / GGX — static declarative row. The shading model
+                        is fixed across the surface; this row asserts it
+                        rather than animating. */}
+                    <span className="text-bone/50">PBR</span>
+                    <span className="text-right text-cobalt">GGX · DGF</span>
                   </div>
                 </div>
 
+                {/* Title — the decrypt animation writes into this node. */}
                 <div className="absolute bottom-6 left-6 md:bottom-12 md:left-12 z-20 pointer-events-none">
                   <h3
                     ref={(el) => {
                       if (el) titleRefs.current[index] = el
                     }}
-                    className="font-syne font-black uppercase tracking-[-0.04em] leading-none text-white group-hover:translate-x-2 whitespace-nowrap"
+                    className="font-syne font-black uppercase tracking-[-0.04em] leading-none text-bone group-hover:translate-x-2 whitespace-nowrap"
                     style={{
                       fontSize: "clamp(2.5rem, 5.5vw, 5rem)",
                       transition: `transform 500ms ${ease.silk}`,
@@ -757,9 +853,10 @@ export const Projects = () => {
                   </h3>
                 </div>
 
+                {/* Open-arrow chip — bottom-right, square, on-hover invert. */}
                 <div className="absolute bottom-6 right-6 md:bottom-12 md:right-12 z-20 pointer-events-none">
                   <div
-                    className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center backdrop-blur-md group-hover:bg-white group-hover:border-white"
+                    className="w-12 h-12 border border-rule-strong flex items-center justify-center backdrop-blur-md group-hover:bg-bone group-hover:border-bone rounded-none"
                     style={{
                       transition: `background 500ms ${ease.mechanical}, border-color 500ms ${ease.mechanical}`,
                     }}
@@ -770,7 +867,7 @@ export const Projects = () => {
                       viewBox="0 0 14 14"
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
-                      className="text-white group-hover:text-black group-hover:translate-x-1 group-hover:-translate-y-1"
+                      className="text-bone group-hover:text-bg-deep group-hover:translate-x-1 group-hover:-translate-y-1"
                       style={{
                         transition: `transform 500ms ${ease.silk}, color 500ms ${ease.mechanical}`,
                       }}
