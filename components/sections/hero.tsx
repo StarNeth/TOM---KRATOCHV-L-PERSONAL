@@ -1,28 +1,75 @@
 "use client"
 
-import { useRef, useState, useEffect } from "react"
+// components/sections/hero.tsx
+// ─────────────────────────────────────────────────────────────────────────
+// THE APERTURE FIELD — Section 6B
+//
+// Not a hero section. A field. Two rows of monumental typography rendered
+// as apertures (background-clip: text) onto a slow-shifting cobalt /
+// platinum / volcanic-orange gradient calibrated against the Liquid
+// Obsidian palette. The fluid lives below; the type is the window.
+//
+// Preserved physics (Section 0):
+//   • Velocity-driven letterSpacing + skew on scroll velocity (velocityBus)
+//   • Preloader handoff via `preloader-complete` event
+//   • webgl-transition dispatch on mount
+//
+// Visual additions:
+//   • Aperture typography (CSS gradient palette, animated)
+//   • Left classification column (vertical writing mode)
+//   • Right coordinates whisper
+//   • Bottom scroll-progress rule with INITIALIZE SEQUENCE label
+//   • Text-only CTA "ENTER SYSTEM" with the precision-line hover
+//
+// Frame system (corner registration marks) is mounted globally in layout.
+// ─────────────────────────────────────────────────────────────────────────
+
+import { useEffect, useRef, useState } from "react"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import { useGSAP } from "@gsap/react"
 import { useLanguage } from "@/components/navigation/language-toggle"
 import { velocityBus } from "@/lib/velocity-bus"
-import { ease } from "@/lib/easing"
+import { ease as easeStrings } from "@/lib/easing"
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger, useGSAP)
 
 const DICTIONARY = {
-  en: { dive: "Enter System", locale: "EN / CZ" },
-  cs: { dive: "Vstoupit do systému", locale: "CZ / EN" },
+  en: {
+    classification: "SYSTEM ARCHITECT",
+    classificationSub: "DUKOVANY NPP",
+    coords: "N 50.0755\u00B0  E 14.4378\u00B0",
+    cta: "ENTER SYSTEM",
+    initSeq: "INITIALIZE SEQUENCE",
+  },
+  cs: {
+    classification: "SYSTÉMOVÝ ARCHITEKT",
+    classificationSub: "JE DUKOVANY",
+    coords: "N 50.0755\u00B0  E 14.4378\u00B0",
+    cta: "VSTOUPIT DO SYSTÉMU",
+    initSeq: "INICIALIZAČNÍ SEKVENCE",
+  },
 }
 
-export const Hero = () => {
+// The aperture gradient — calibrated against Liquid Obsidian palette:
+// cobalt #1B3A6E → platinum #E8E6E1 → volcanic #B8421E. Slow drift.
+const APERTURE_BG = `
+  radial-gradient(120% 80% at 30% 30%, #1B3A6E 0%, transparent 55%),
+  radial-gradient(140% 90% at 75% 60%, #E8E6E1 0%, transparent 45%),
+  radial-gradient(100% 70% at 50% 90%, #B8421E 0%, transparent 50%),
+  linear-gradient(180deg, #1B3A6E 0%, #E8E6E1 55%, #B8421E 100%)
+`
+
+export const Hero = (): React.ReactElement => {
   const containerRef = useRef<HTMLElement>(null)
   const nameRef = useRef<HTMLHeadingElement>(null)
   const firstRowRef = useRef<HTMLSpanElement>(null)
   const secondRowRef = useRef<HTMLSpanElement>(null)
-  const tickerRef = useRef<HTMLSpanElement>(null)
+  const progressFillRef = useRef<HTMLSpanElement>(null)
+  const ctaRef = useRef<HTMLButtonElement>(null)
+  const subLabelRef = useRef<HTMLDivElement>(null)
   const { language } = useLanguage()
-  const content = DICTIONARY[language as keyof typeof DICTIONARY]
+  const t = DICTIONARY[language as keyof typeof DICTIONARY]
 
   const [animState, setAnimState] = useState<{ ready: boolean; isBot: boolean }>(
     () => {
@@ -37,9 +84,6 @@ export const Hero = () => {
     }
   )
 
-  // Visibility gate for the velocity rAF — keeps it from burning CPU after
-  // the hero is scrolled past. Combined with animState.ready, the loop only
-  // fires while (a) the hero is mounted+revealed AND (b) on-screen.
   const [isVisible, setIsVisible] = useState(true)
 
   useEffect(() => {
@@ -48,26 +92,23 @@ export const Hero = () => {
     )
   }, [])
 
+  // Preloader handoff.
   useEffect(() => {
     const triggerAnim = (e: Event) => {
       const customEvent = e as CustomEvent
       setAnimState({ ready: true, isBot: !!customEvent.detail?.isBot })
     }
     window.addEventListener("preloader-complete", triggerAnim)
-
     const failsafe = window.setTimeout(() => {
-      setAnimState((prev) =>
-        prev.ready ? prev : { ready: true, isBot: false }
-      )
+      setAnimState((prev) => (prev.ready ? prev : { ready: true, isBot: false }))
     }, 1800)
-
     return () => {
       window.removeEventListener("preloader-complete", triggerAnim)
       window.clearTimeout(failsafe)
     }
   }, [])
 
-  // IntersectionObserver — pause rAF when hero is out of view.
+  // Visibility gate for the velocity rAF.
   useEffect(() => {
     if (!containerRef.current) return
     const io = new IntersectionObserver(
@@ -78,7 +119,8 @@ export const Hero = () => {
     return () => io.disconnect()
   }, [])
 
-  // Velocity-driven skew + tracking — rAF, zero re-renders, gated on visibility.
+  // Sacred physics — velocity-driven skew + tracking on the name.
+  // Sub-label vertical shift coupled to structural energy.
   useEffect(() => {
     if (!animState.ready || !isVisible) return
     let raf = 0
@@ -86,14 +128,10 @@ export const Hero = () => {
       const { normalized, intensity } = velocityBus.get()
       const h1 = nameRef.current
       if (h1) {
-        const skew = normalized * -4
-        const tracking = -0.04 - intensity * 0.02
+        const skew = normalized * -3.5
+        const tracking = -0.055 - intensity * 0.018
         h1.style.setProperty("--skew", `${skew}deg`)
         h1.style.setProperty("--track", `${tracking}em`)
-      }
-      if (tickerRef.current) {
-        const drift = Math.round(normalized * 40)
-        tickerRef.current.style.setProperty("--drift", `${drift}px`)
       }
       raf = requestAnimationFrame(tick)
     }
@@ -107,66 +145,61 @@ export const Hero = () => {
         typeof window !== "undefined" &&
         !!sessionStorage.getItem("preloader_played")
 
+      // Initial state: rows clipped from below — the measurement plate metaphor.
       if (alreadyPlayed || animState.isBot) {
         gsap.set([firstRowRef.current, secondRowRef.current], {
-          yPercent: 0,
+          clipPath: "inset(0 0 0% 0)",
           opacity: 1,
-          filter: "blur(0px)",
+          y: 0,
           clearProps: "willChange",
         })
         gsap.set(".hero-ui", { opacity: 1, y: 0 })
       } else if (animState.ready) {
         gsap.set([firstRowRef.current, secondRowRef.current], {
-          yPercent: 110,
-          opacity: 0,
-          filter: "blur(14px)",
+          clipPath: "inset(0 0 100% 0)",
+          opacity: 1,
         })
-        gsap.set(".hero-ui", { opacity: 0, y: 12 })
+        gsap.set(".hero-ui", { opacity: 0, y: 8 })
 
         const tl = gsap.timeline()
         tl.to(firstRowRef.current, {
-          yPercent: 0,
-          opacity: 1,
-          filter: "blur(0px)",
-          duration: 1.4,
-          ease: ease.silk,
+          clipPath: "inset(0 0 0% 0)",
+          duration: 1.1,
+          ease: easeStrings.silk,
         })
           .to(
             secondRowRef.current,
             {
-              yPercent: 0,
-              opacity: 1,
-              filter: "blur(0px)",
-              duration: 1.4,
-              ease: ease.silk,
+              clipPath: "inset(0 0 0% 0)",
+              duration: 1.1,
+              ease: easeStrings.silk,
             },
-            "-=1.15"
+            "-=0.85"
           )
           .to(
             ".hero-ui",
             {
               opacity: 1,
               y: 0,
-              duration: 0.9,
-              ease: ease.decay,
-              stagger: 0.12,
+              duration: 0.8,
+              ease: easeStrings.silk,
+              stagger: 0.08,
             },
-            "-=0.7"
+            "-=0.55"
           )
       } else {
         gsap.set([firstRowRef.current, secondRowRef.current], {
-          yPercent: 110,
-          opacity: 0,
-          filter: "blur(14px)",
+          clipPath: "inset(0 0 100% 0)",
+          opacity: 1,
         })
-        gsap.set(".hero-ui", { opacity: 0, y: 12 })
+        gsap.set(".hero-ui", { opacity: 0, y: 8 })
       }
 
+      // Hero exits — the entire field rises and dims.
       gsap.to(containerRef.current, {
-        yPercent: 18,
+        yPercent: 14,
         opacity: 0,
-        filter: "blur(14px)",
-        ease: ease.mechanical,
+        ease: easeStrings.mechanical,
         scrollTrigger: {
           trigger: containerRef.current,
           start: "top top",
@@ -174,6 +207,24 @@ export const Hero = () => {
           scrub: 1,
         },
       })
+
+      // Scroll progress rule — fills as the user scrolls through the hero.
+      if (progressFillRef.current) {
+        gsap.fromTo(
+          progressFillRef.current,
+          { width: "0%" },
+          {
+            width: "100%",
+            ease: "none",
+            scrollTrigger: {
+              trigger: containerRef.current,
+              start: "top top",
+              end: "bottom top",
+              scrub: true,
+            },
+          }
+        )
+      }
     },
     { scope: containerRef, dependencies: [animState.ready, animState.isBot] }
   )
@@ -181,68 +232,135 @@ export const Hero = () => {
   return (
     <section
       ref={containerRef}
-      className="relative h-[100svh] w-full flex flex-col justify-center items-center z-10 perspective-[1000px] overflow-hidden"
+      id="top"
+      className="relative w-full overflow-hidden z-10"
+      style={{ height: "100svh" }}
     >
+      {/* LEFT CLASSIFICATION COLUMN */}
       <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-[1]"
+        className="hero-ui hidden md:flex absolute z-[3] flex-col items-start gap-3"
         style={{
-          background:
-            "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.14) 55%, rgba(0,0,0,0) 85%)",
+          left: 28,
+          top: "50%",
+          transform: "translateY(-50%) rotate(-90deg)",
+          transformOrigin: "left center",
+          paddingLeft: 8,
         }}
-      />
-
-      <div
-        className="hero-ui absolute left-4 top-1/2 -translate-y-1/2 -rotate-90 origin-left font-mono text-[9px] tracking-[0.6em] text-white/45 uppercase pointer-events-none z-[2]"
-        style={{ textShadow: "0 0 12px rgba(0,0,0,0.7)" }}
+        aria-hidden
       >
-        {content.locale}
-      </div>
-      <div
-        className="hero-ui absolute right-4 top-1/2 -translate-y-1/2 rotate-90 origin-right font-mono text-[9px] tracking-[0.6em] text-white/45 uppercase pointer-events-none z-[2]"
-        style={{ textShadow: "0 0 12px rgba(0,0,0,0.7)" }}
-      >
-        N 50.0755 · E 14.4378
+        <span
+          className="font-sans font-black"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.35em",
+            color: "rgba(255,255,255,0.45)",
+            textTransform: "uppercase",
+          }}
+        >
+          {t.classification}
+        </span>
+        <span
+          aria-hidden
+          style={{ width: 24, height: 1, background: "var(--rule-active)" }}
+        />
+        <span
+          className="type-mono-micro-8"
+          style={{ color: "var(--text-dim)" }}
+        >
+          {t.classificationSub}
+        </span>
       </div>
 
-      <div className="relative z-[3] flex flex-col items-center w-full max-w-[100vw] px-4 sm:px-6">
+      {/* RIGHT COORDINATES */}
+      <div
+        className="hero-ui hidden md:block absolute z-[3]"
+        style={{
+          right: 28,
+          top: "50%",
+          transform: "translateY(-50%) rotate(90deg)",
+          transformOrigin: "right center",
+          paddingRight: 8,
+        }}
+        aria-hidden
+      >
+        <span
+          className="type-mono-micro-8"
+          style={{ color: "var(--text-data)" }}
+        >
+          {t.coords}
+        </span>
+      </div>
+
+      {/* THE APERTURES — two rows of monumental, fluid-windowed typography */}
+      <div
+        className="absolute inset-0 flex flex-col justify-center items-center z-[2] px-4 sm:px-8"
+      >
         <h1
           ref={nameRef}
+          aria-label="Tomáš Kratochvíl"
+          className="relative text-center w-full"
           style={{
-            ["--skew" as any]: "0deg",
-            ["--track" as any]: "-0.04em",
+            ["--skew" as string]: "0deg",
+            ["--track" as string]: "-0.055em",
             transform: "skewY(var(--skew))",
             letterSpacing: "var(--track)",
-            fontFeatureSettings: '"ss01", "ss02", "cv01", "ss03"',
             willChange: "transform, letter-spacing",
             transition: "transform 120ms linear, letter-spacing 200ms linear",
-            filter:
-              "drop-shadow(0 2px 18px rgba(0,0,0,0.65)) drop-shadow(0 0 42px rgba(0,0,0,0.40)) drop-shadow(0 0 28px rgba(255,255,255,0.06))",
-            color: "#ffffff",
+            fontFeatureSettings: '"ss01", "ss02", "cv01"',
+            fontFamily: "var(--font-sans), sans-serif",
+            fontWeight: 900,
+            lineHeight: 0.78,
+            textTransform: "uppercase",
           }}
-          className="relative font-sans font-black leading-[0.82] uppercase text-center w-full flex flex-col items-center"
         >
-          <span className="block overflow-hidden w-full">
+          <span
+            aria-hidden
+            className="block w-full overflow-hidden"
+            style={{
+              clipPath: "inset(0 0 100% 0)",
+              willChange: "clip-path",
+            }}
+            ref={firstRowRef}
+          >
             <span
-              ref={firstRowRef}
-              className="block whitespace-nowrap"
+              className="block whitespace-nowrap mx-auto"
               style={{
-                fontSize: "clamp(3.2rem, 15vw, 22rem)",
+                fontSize: "clamp(4rem, 16vw, 22rem)",
+                background: APERTURE_BG,
+                backgroundSize: "240% 240%",
+                animation: "aperture-drift 24s ease-in-out infinite",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                color: "transparent",
+                WebkitTextFillColor: "transparent",
                 marginLeft: "-0.04em",
               }}
             >
               TOMÁŠ
             </span>
           </span>
-          <span className="block overflow-hidden w-full -mt-[0.06em]">
+          <span
+            aria-hidden
+            className="block w-full overflow-hidden"
+            style={{
+              clipPath: "inset(0 0 100% 0)",
+              willChange: "clip-path",
+              marginTop: "-0.06em",
+            }}
+            ref={secondRowRef}
+          >
             <span
-              ref={secondRowRef}
-              className="block"
+              className="block whitespace-nowrap mx-auto"
               style={{
-                fontSize: "clamp(2.2rem, 10.5vw, 15rem)",
-                color: "rgba(255,255,255,0.94)",
+                fontSize: "clamp(2.6rem, 11.5vw, 16rem)",
+                background: APERTURE_BG,
+                backgroundSize: "240% 240%",
+                animation: "aperture-drift 28s ease-in-out infinite reverse",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                color: "transparent",
+                WebkitTextFillColor: "transparent",
                 marginRight: "-0.04em",
-                whiteSpace: "nowrap",
               }}
             >
               KRATOCHVÍL
@@ -250,34 +368,112 @@ export const Hero = () => {
           </span>
         </h1>
 
+        {/* SUB-LABEL — coupled to structural energy. ±4px vertical shift. */}
         <div
-          className="hero-ui mt-10 flex items-center gap-4 font-mono text-[10px] tracking-[0.45em] uppercase text-white/60"
-          style={{ textShadow: "0 0 16px rgba(0,0,0,0.75)" }}
+          ref={subLabelRef}
+          className="hero-ui mt-8 flex items-center gap-3"
+          style={{
+            transform: "translateY(var(--coupling-hero-sub, 0px))",
+            transition: "transform 80ms linear",
+          }}
         >
-          <span className="block h-px w-10 bg-white/30" />
-          <span>System Architect</span>
-          <span className="block h-px w-10 bg-white/30" />
+          <span
+            aria-hidden
+            style={{ width: 32, height: 1, background: "var(--rule-active)" }}
+          />
+          <span
+            className="type-mono-micro"
+            style={{ color: "var(--text-data)" }}
+          >
+            {t.classification}
+          </span>
+          <span
+            aria-hidden
+            style={{ width: 32, height: 1, background: "var(--rule-active)" }}
+          />
         </div>
       </div>
 
-      <div className="hero-ui absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-[4] text-white pointer-events-auto">
-        <div className="w-[1px] h-10 bg-gradient-to-b from-white/0 via-white/40 to-white/0 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1/2 bg-white animate-[bounce_2s_infinite]" />
+      {/* BOTTOM: scroll-progress rule + INITIALIZE SEQUENCE label + CTA */}
+      <div
+        className="hero-ui absolute z-[4] left-0 right-0"
+        style={{ bottom: 32 }}
+      >
+        <div className="mx-auto max-w-[1200px] px-6 flex flex-col items-center gap-3">
+          <button
+            ref={ctaRef}
+            type="button"
+            onClick={() => {
+              const el = document.getElementById("about")
+              if (!el) return
+              el.scrollIntoView({ behavior: "smooth" })
+            }}
+            className="precision-line"
+            style={{
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: 9,
+              letterSpacing: "0.45em",
+              textTransform: "uppercase",
+              color: "var(--text-data)",
+              background: "transparent",
+              border: "none",
+              padding: "8px 4px",
+            }}
+          >
+            {t.cta}
+          </button>
+          <div
+            className="w-full relative"
+            style={{ marginTop: 16 }}
+            aria-hidden
+          >
+            <span
+              className="type-mono-micro-8 absolute left-1/2"
+              style={{
+                top: -16,
+                transform: "translateX(-50%)",
+                color: "var(--text-dim)",
+              }}
+            >
+              {t.initSeq}
+            </span>
+            <span
+              aria-hidden
+              style={{
+                display: "block",
+                width: "100%",
+                height: 1,
+                background: "var(--rule)",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <span
+                ref={progressFillRef}
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "0%",
+                  background: "rgba(255,255,255,0.35)",
+                }}
+              />
+            </span>
+          </div>
         </div>
-        <span
-          ref={tickerRef}
-          style={{
-            ["--drift" as any]: "0px",
-            transform: "translateX(var(--drift))",
-            willChange: "transform",
-            transition: "transform 180ms linear",
-            textShadow: "0 0 14px rgba(0,0,0,0.75)",
-          }}
-          className="font-mono text-[9px] tracking-[0.6em] text-white/55 uppercase"
-        >
-          {content.dive}
-        </span>
       </div>
+
+      <style jsx>{`
+        @keyframes aperture-drift {
+          0%, 100% { background-position: 0% 0%; }
+          25%      { background-position: 100% 30%; }
+          50%      { background-position: 60% 100%; }
+          75%      { background-position: 20% 60%; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          @keyframes aperture-drift { 0%, 100% { background-position: 50% 50%; } }
+        }
+      `}</style>
     </section>
   )
 }

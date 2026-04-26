@@ -98,6 +98,7 @@ import { useWebGLSupport } from "@/hooks/use-webgl-support"
 import { CSSFallbackGradient } from "./css-fallback-gradient"
 import { WebGLErrorBoundary } from "./WebGLErrorBoundary"
 import { velocityBus } from "@/lib/velocity-bus"
+import { coreStateBus } from "@/lib/core-state-bus"
 // cursorBus lives in its own file so cursor.tsx (statically imported by
 // the root layout on every route — including /work/[id]) doesn't drag
 // `three` and `@react-three/postprocessing` into the SSR module graph.
@@ -326,7 +327,7 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════���══════════
     // PBR — Cook-Torrance GGX BRDF
     // Cheap arithmetic only — no noise samples.
     // ═══════════════════════════════════════════════════════════════════
@@ -607,6 +608,17 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       firedRef.current = true
       onFirstFrame()
     }
+
+    // ── GPU → DOM TELEMETRY ───────────────────────────────────────────
+    // Mutated in place. React cannot observe it. Consumers poll via rAF.
+    // `energy` is the public single number — a composite the DOM can
+    // couple to. It rises with scroll intensity, the turbulence burst,
+    // and the cursor wake. Bounded to [0..1] without ever clamping at 1.
+    coreStateBus.turbulence = trb.value
+    coreStateBus.intensity  = bus.intensity
+    const composite = bus.intensity * 0.55 + trb.value * 0.30 + c.energy * 0.55
+    coreStateBus.energy = composite > 1 ? 1 : composite < 0 ? 0 : composite
+    coreStateBus.frame  = state.gl.info.render.frame
   })
 
   return (
