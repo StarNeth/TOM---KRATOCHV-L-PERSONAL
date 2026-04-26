@@ -8,7 +8,8 @@ import { Preloader } from "@/components/ui/preloader";
 import { DynamicFavicon } from "@/components/dynamic-favicon";
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { DelayedRenderer } from "@/components/providers/delayed-renderer";
-import { VelocityDriver } from "@/components/providers/velocity-driver"; 
+import { VelocityDriver } from "@/components/providers/velocity-driver";
+import { SystemOverlay } from "@/components/system/system-overlay";
 
 const syne = Syne({ subsets: ["latin"], weight: ["400", "700", "800"], variable: "--font-syne", display: "swap" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
@@ -78,6 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <LenisProvider>
             <VelocityDriver />
             {children}
+            <SystemOverlay />
             <DynamicFavicon />
           </LenisProvider>
         </LanguageProvider>

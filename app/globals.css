@@ -1,80 +1,110 @@
 @import "tailwindcss";
 
-/* Custom easing tokens exposed to CSS transitions */
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SYSTEM ARCHITECT — DESIGN TOKENS
+ *
+ * Colors (5 + rare 6th):
+ *   --color-obsidian   near-black, the global background
+ *   --color-graphite   mid-dark gray, secondary surfaces / dividers
+ *   --color-bone       warm off-white, primary foreground
+ *   --color-cobalt     cool electric blue — brand accent (matches WebGL "cobalt" zone)
+ *   --color-amber      warm metallic — brand accent (matches WebGL "nuke" zone)
+ *   --color-surgical   rare red — used like a single LED, NEVER for surfaces
+ *
+ * Type stack:
+ *   --font-display     Syne (h1, hero, project titles)
+ *   --font-body        Syne (body running text — same family, lighter weights)
+ *   --font-italic      Instrument Serif italic (editorial counterpoint)
+ *   --font-mono        JetBrains Mono (HUD readouts, micro-labels, telemetry)
+ *
+ * Motion:
+ *   --ease-silk        cubic-bezier(0.22, 1, 0.36, 1)  — entrances, reveals
+ *   --ease-mechanical  cubic-bezier(0.76, 0, 0.24, 1)  — UI snaps, commits
+ *   --ease-decay       cubic-bezier(0.33, 1, 0.68, 1)  — exits, dissolves
+ *
+ * Durations (ms):
+ *   --dur-instant 120  --dur-tap 240  --dur-beat 400  --dur-bar 700
+ *   --dur-long 1200    --dur-epic 1800
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
 :root {
+  /* ── EASING (CSS-facing — also exported from lib/easing.ts) ── */
   --ease-silk: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-mechanical: cubic-bezier(0.76, 0, 0.24, 1);
   --ease-decay: cubic-bezier(0.33, 1, 0.68, 1);
-}
 
-/* Replace the hand-rolled text-hero numbers with something that actually hurts */
-.text-hero {
-  font-size: clamp(4rem, 22vw, 28rem);
-  line-height: 0.82;
-  letter-spacing: -0.06em;
-  font-weight: 900;
-  font-feature-settings: "ss01", "ss02", "cv01";
-}
+  /* ── DURATIONS ── */
+  --dur-instant: 120ms;
+  --dur-tap:     240ms;
+  --dur-beat:    400ms;
+  --dur-bar:     700ms;
+  --dur-long:    1200ms;
+  --dur-epic:    1800ms;
 
-/* Optional: kill the `cursor: none !important` on inputs so textareas work */
-input, textarea, [contenteditable="true"] {
-  cursor: text !important;
-}
+  /* ── HUD / FRAME WIDTHS ── */
+  --frame-rule: 1px;
+  --frame-pad:  clamp(0.75rem, 1.5vw, 1.5rem);
 
-html, body {
-  overflow-x: hidden; /* Zakáže posouvání do stran (horizontal scroll) */
-  width: 100%;
-  position: relative;
-}
-
-@layer base {
-  body {
-    -webkit-font-smoothing: subpixel-antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-    background-color: #030303;
-  }
-  
-  /* ABSOLUTNÍ SMRT PRO SYSTÉMOVÉ KURZORY A SCROLLBARY */
-  * {
-    cursor: none !important;
-    scrollbar-width: none !important; /* Firefox */
-    -ms-overflow-style: none !important; /* IE and Edge */
-  }
-  
-  *::-webkit-scrollbar {
-    display: none !important; /* Chrome, Safari and Opera */
-  }
-}
-
-@theme inline {
-  --font-sans: "Syne", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
-
-  --color-background: oklch(0.035 0 0);
-  --color-foreground: oklch(0.92 0 0);
-  --color-card: oklch(0.06 0 0);
-  --color-card-foreground: oklch(0.92 0 0);
-  --color-popover: oklch(0.06 0 0);
-  --color-popover-foreground: oklch(0.92 0 0);
-  --color-primary: oklch(0.92 0 0);
-  --color-primary-foreground: oklch(0.035 0 0);
-  --color-secondary: oklch(0.12 0 0);
-  --color-secondary-foreground: oklch(0.92 0 0);
-  --color-muted: oklch(0.18 0 0);
-  --color-muted-foreground: oklch(0.45 0 0);
-  --color-accent: oklch(0.035 0 0);
-  --color-accent-foreground: oklch(0.92 0 0);
-  --color-destructive: oklch(0.55 0.2 25);
-  --color-border: oklch(0.16 0 0);
-  --color-input: oklch(0.12 0 0);
-  --color-ring: oklch(0.45 0 0);
+  /* ── DEFAULT BORDER RADIUS ── */
   --radius: 0px;
-
-  --color-obsidian: oklch(0.02 0 0);
-  --color-dim: oklch(0.35 0 0);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TAILWIND THEME — token-driven. Tailwind v4 uses @theme inline {}.
+ * Semantic tokens (background/foreground/border/etc) map to OKLCH literals
+ * so dark-mode tone is precisely controlled, not approximated via filters.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@theme inline {
+  /* Fonts — semantic aliases map to Next.js Google-font CSS variables. */
+  --font-sans:       var(--font-syne, system-ui, sans-serif);
+  --font-display:    var(--font-syne, system-ui, sans-serif);
+  --font-body:       var(--font-syne, system-ui, sans-serif);
+  --font-italic:     var(--font-instrument, Georgia, serif);
+  --font-mono:       var(--font-jetbrains, ui-monospace, "Menlo", monospace);
+
+  /* ── 5-COLOR PALETTE + 1 RARE ACCENT ── */
+  --color-obsidian:  oklch(0.025 0 0);
+  --color-graphite:  oklch(0.20 0 0);
+  --color-bone:      oklch(0.94 0.005 80);
+  --color-cobalt:    oklch(0.58 0.18 250);
+  --color-amber:     oklch(0.78 0.16 65);
+  --color-surgical:  oklch(0.60 0.24 26);
+
+  /* ── SEMANTIC TOKENS — what shadcn/ui consumes ── */
+  --color-background:           var(--color-obsidian);
+  --color-foreground:           var(--color-bone);
+
+  --color-card:                 oklch(0.06 0 0);
+  --color-card-foreground:      var(--color-bone);
+  --color-popover:              oklch(0.06 0 0);
+  --color-popover-foreground:   var(--color-bone);
+
+  --color-primary:              var(--color-bone);
+  --color-primary-foreground:   var(--color-obsidian);
+  --color-secondary:            oklch(0.12 0 0);
+  --color-secondary-foreground: var(--color-bone);
+
+  --color-muted:                var(--color-graphite);
+  --color-muted-foreground:     oklch(0.55 0 0);
+
+  --color-accent:               var(--color-cobalt);
+  --color-accent-foreground:    var(--color-bone);
+
+  --color-destructive:          var(--color-surgical);
+  --color-border:               oklch(0.16 0 0);
+  --color-input:                oklch(0.12 0 0);
+  --color-ring:                 oklch(0.45 0 0);
+
+  /* ── DIM / DETAIL TOKENS for HUD work ── */
+  --color-dim:                  oklch(0.40 0 0);
+  --color-dim-strong:           oklch(0.55 0 0);
+
+  --radius: var(--radius);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * BASE LAYER — global element rules.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 @layer base {
   * {
     @apply border-border;
@@ -83,58 +113,56 @@ html, body {
   html {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "ss01", "ss02", "cv01";
+    background-color: var(--color-obsidian);
   }
 
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: subpixel-antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+    width: 100%;
+    position: relative;
+  }
+
+  html, body {
     overflow-x: hidden;
   }
 
   ::selection {
     @apply bg-foreground text-background;
   }
+
+  /* Native cursor + scrollbar suppression — system uses custom Cursor + Lenis. */
+  * {
+    cursor: none !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  *::-webkit-scrollbar { display: none !important; }
+
+  /* Inputs need text cursor or they're unusable. */
+  input, textarea, [contenteditable="true"] {
+    cursor: text !important;
+  }
 }
 
-/* Lenis */
-html.lenis,
-html.lenis body {
-  height: auto;
-}
-
-.lenis.lenis-smooth {
-  scroll-behavior: auto !important;
-}
-
-.lenis.lenis-smooth [data-lenis-prevent] {
-  overscroll-behavior: contain;
-}
-
-.lenis.lenis-stopped {
-  overflow: hidden;
-}
-
-/* Grain */
-.grain {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  opacity: 0.022;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-/* Text styles */
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TYPOGRAPHIC SCALE — clamp-based, viewport-fluid.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 .text-hero {
-  font-size: clamp(3rem, 14vw, 13rem);
-  line-height: 0.85;
-  letter-spacing: -0.04em;
-  font-weight: 700;
+  font-size: clamp(3.2rem, 15vw, 22rem);
+  line-height: 0.82;
+  letter-spacing: -0.06em;
+  font-weight: 900;
+  font-feature-settings: "ss01", "ss02", "cv01";
 }
 
 .text-hero-sub {
-  font-size: clamp(2rem, 8vw, 7rem);
-  line-height: 0.9;
-  letter-spacing: -0.03em;
+  font-size: clamp(2.2rem, 10.5vw, 15rem);
+  line-height: 0.85;
+  letter-spacing: -0.04em;
   font-weight: 400;
 }
 
@@ -145,7 +173,38 @@ html.lenis body {
   font-weight: 600;
 }
 
-/* WebGL */
+.text-hud {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+.text-hud-sm {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * GRAIN OVERLAY — fine SVG noise, single fixed layer, z-index above WebGL.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.022;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * WEBGL POSITIONING — fixed full-bleed, behind content.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 .webgl-canvas {
   position: fixed !important;
   inset: 0;
@@ -158,115 +217,120 @@ html.lenis body {
   z-index: 10;
 }
 
-/* Line animation */
+/* ═══════════════════════════════════════════════════════════════════════════
+ * LENIS SMOOTH-SCROLL CONTRACT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+html.lenis,
+html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * UTILITIES — line reveals, clip reveals, scrollbar hide, project image hover.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 .line-reveal {
   position: relative;
   display: inline-block;
 }
-
 .line-reveal::after {
   content: "";
   position: absolute;
-  bottom: 0;
-  left: 0;
+  bottom: 0; left: 0;
   width: 100%;
   height: 1px;
   background: currentColor;
   transform: scaleX(0);
   transform-origin: right;
-  transition: transform 0.5s cubic-bezier(0.65, 0, 0.35, 1);
+  transition: transform 500ms var(--ease-mechanical);
 }
-
 .line-reveal:hover::after {
   transform: scaleX(1);
   transform-origin: left;
 }
 
-/* Cursor */
-.cursor-dot {
-  @apply fixed pointer-events-none z-[10000] mix-blend-difference;
-  transform: translate(-50%, -50%);
-}
-
-/* Scrollbar hide */
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-/* Project card */
-.project-image {
-  transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.project-card:hover .project-image {
-  transform: scale(1.05);
-}
-
-/* Clip reveal */
 .clip-reveal {
   clip-path: inset(0 0 100% 0);
-  transition: clip-path 1s cubic-bezier(0.77, 0, 0.175, 1);
+  transition: clip-path 1s var(--ease-mechanical);
 }
-
 .clip-reveal.revealed {
   clip-path: inset(0 0 0 0);
 }
 
-/* Split text char */
 .char {
   display: inline-block;
   transform: translateY(100%);
   opacity: 0;
 }
 
-/* Horizontal scroll */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+.project-image {
+  transition: transform 1.2s var(--ease-silk);
+}
+.project-card:hover .project-image {
+  transform: scale(1.05);
+}
+
 .horizontal-section {
   display: flex;
   flex-wrap: nowrap;
 }
 
-/* Magnetic area */
 .magnetic {
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 300ms var(--ease-silk);
 }
 
-/* WebGL CSS Fallback Gradient Animations */
+/* Surgical-red helper class — used by SurgicalCoordinates HUD dot. */
+.bg-surgical-red {
+  background-color: var(--color-surgical);
+}
+
+/* Cursor host — actual node lives in components/ui/cursor.tsx. */
+.cursor-dot {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+  mix-blend-mode: difference;
+  transform: translate(-50%, -50%);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * WEBGL CSS FALLBACK GRADIENT — animated when WebGL is unavailable.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 @keyframes gradient-shift {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  25% {
-    transform: translate(-2%, 1%) scale(1.02);
-  }
-  50% {
-    transform: translate(1%, -1%) scale(1.01);
-  }
-  75% {
-    transform: translate(-1%, 2%) scale(1.03);
-  }
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25%      { transform: translate(-2%, 1%) scale(1.02); }
+  50%      { transform: translate(1%, -1%) scale(1.01); }
+  75%      { transform: translate(-1%, 2%) scale(1.03); }
 }
-
 @keyframes gradient-pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.3;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.2;
-  }
+  0%, 100% { transform: scale(1);   opacity: 0.3; }
+  50%      { transform: scale(1.1); opacity: 0.2; }
 }
-
 .animate-gradient-shift {
   animation: gradient-shift 20s ease-in-out infinite;
   will-change: transform;
 }
-
 .animate-gradient-pulse {
   animation: gradient-pulse 8s ease-in-out infinite;
   will-change: transform, opacity;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * REDUCED MOTION — final guardrail. JS hooks already short-circuit, but
+ * lingering CSS animations get killed here as a belt-and-braces measure.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .grain { display: none; }
 }
