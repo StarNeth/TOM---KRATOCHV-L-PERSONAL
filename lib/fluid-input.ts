@@ -23,12 +23,27 @@ export interface SplatParams {
   splatMaterial: THREE.RawShaderMaterial
 }
 
+export interface InitFromTextureParams {
+  sourceTex: THREE.Texture
+  tint: THREE.Vector3
+  opacity: number
+  renderer: THREE.WebGLRenderer
+  dyeFBO: FBOPair
+  blitMaterial: THREE.RawShaderMaterial
+}
+
 interface SplatUniforms {
   uTarget: { value: THREE.Texture | null }
   uPoint: { value: THREE.Vector2 }
   uColor: { value: THREE.Vector3 }
   uRadius: { value: number }
   uAspect: { value: number }
+}
+
+interface BlitUniforms {
+  uSource: { value: THREE.Texture | null }
+  uTint: { value: THREE.Vector3 }
+  uOpacity: { value: number }
 }
 
 export class FluidInput {
@@ -54,9 +69,15 @@ export class FluidInput {
     this.dyeFBO = dyeFBO
 
     const geometry: THREE.BufferGeometry = new THREE.BufferGeometry()
-    // Three placeholder vertices — values are unused; gl_VertexID drives
-    // position derivation in ADVECT_VERT.
-    const positions: Float32Array = new Float32Array([0, 0, 0, 0, 0, 0, 0, 0, 0])
+    // Fullscreen triangle. ADVECT_VERT (300 ES) ignores `position` and
+    // derives coordinates from gl_VertexID, but 1.00-style vertex
+    // shaders (e.g. the blit pass) read `position` directly — these
+    // values must form a valid clip-space cover, not zeros.
+    const positions: Float32Array = new Float32Array([
+      -1, -1, 0,
+       3, -1, 0,
+      -1,  3, 0,
+    ])
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
 
     // Material is assigned per-call from SplatParams. We start with a
@@ -116,6 +137,36 @@ export class FluidInput {
     // Restore the renderer's default target so subsequent draws do not
     // accidentally write into the dye FBO.
     renderer.setRenderTarget(null)
+  }
+
+  /**
+   * One-shot blit: copies a source texture (typically the bake of static
+   * text geometry) into the dye field, tinted and scaled by alpha.
+   *
+   * The supplied material is expected to use BLIT_FRAG, which interprets
+   * the source's red channel as a mask — so a white-on-black bake feeds
+   * the silhouette directly into the dye buffer's RGB+A.
+   *
+   * Renders into dyeFBO.write and swaps so the result becomes the next
+   * read target. Restores the renderer's previous render target so this
+   * call can be made from inside another render pass without disturbing
+   * its output binding.
+   */
+  initFromTexture(params: InitFromTextureParams): void {
+    const { sourceTex, tint, opacity, renderer, dyeFBO, blitMaterial } = params
+
+    this.mesh.material = blitMaterial
+
+    const uniforms: BlitUniforms = blitMaterial.uniforms as unknown as BlitUniforms
+    uniforms.uSource.value = sourceTex
+    uniforms.uTint.value = tint
+    uniforms.uOpacity.value = opacity
+
+    const prevTarget: THREE.WebGLRenderTarget | null = renderer.getRenderTarget()
+    renderer.setRenderTarget(dyeFBO.write)
+    renderer.render(this.scene, this.camera)
+    dyeFBO.swap()
+    renderer.setRenderTarget(prevTarget)
   }
 
   /**

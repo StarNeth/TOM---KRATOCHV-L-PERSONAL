@@ -41,6 +41,7 @@ import * as THREE from "three"
 
 import { createFBOPair, type FBOPair } from "@/lib/fbo-system"
 import { cursorBus } from "@/lib/cursor-bus"
+import { FluidInput } from "@/lib/fluid-input"
 import { ADVECT_VERT, ADVECT_FRAG } from "@/shaders/fluid-advect.glsl"
 import {
   CURL_FRAG,
@@ -49,6 +50,7 @@ import {
   GRADIENT_SUBTRACT_FRAG,
 } from "@/shaders/fluid-ops.glsl"
 import { SPLAT_FRAG } from "@/shaders/fluid-splat.glsl"
+import { BLIT_FRAG } from "@/shaders/fluid-init.glsl"
 
 // --------------------------------------------------------------------------
 // GLSL ES 1.00 vertex shader for the operator passes. RawShaderMaterial
@@ -117,6 +119,14 @@ export interface FluidSimulationProps {
   curl?: number
   /** Per-frame dye dissipation factor in (0, 1]. */
   dissipation?: number
+  /**
+   * One-shot seed texture for the dye field. When provided, the first
+   * frame after mount blits this texture into the dye buffer (using
+   * BLIT_FRAG) before any solver passes run, so subsequent advection
+   * carries the seeded silhouette around. Re-supplying a different
+   * texture later does not re-seed — this is intentionally one-shot.
+   */
+  initialTexture?: THREE.Texture | null
   /** Called every frame after the dye field has been updated. */
   onDyeReady?: (tex: THREE.Texture) => void
 }
@@ -188,6 +198,7 @@ export default function FluidSimulation(props: FluidSimulationProps): null {
     pressureIterations = 20,
     curl: curlStrength = 30,
     dissipation = 0.98,
+    initialTexture,
     onDyeReady,
   } = props
 
@@ -248,6 +259,7 @@ export default function FluidSimulation(props: FluidSimulationProps): null {
     pressure: THREE.RawShaderMaterial
     gradient: THREE.RawShaderMaterial
     splat: THREE.RawShaderMaterial
+    blit: THREE.RawShaderMaterial
   }>(() => {
     const texel: THREE.Vector2 = new THREE.Vector2(1 / resolution, 1 / resolution)
 
@@ -325,8 +337,37 @@ export default function FluidSimulation(props: FluidSimulationProps): null {
       },
     })
 
-    return { advect, curl, vorticity, divergence, pressure, gradient, splat }
+    // BLIT_FRAG is GLSL ES 1.00 (texture2D / gl_FragColor / varying);
+    // pair it with the matching V100_VERT used by the operator passes.
+    const blit: THREE.RawShaderMaterial = new THREE.RawShaderMaterial({
+      vertexShader: V100_VERT,
+      fragmentShader: BLIT_FRAG,
+      uniforms: {
+        uSource: { value: null },
+        uTint: { value: new THREE.Vector3(1, 1, 1) },
+        uOpacity: { value: 1 },
+      },
+    })
+
+    return { advect, curl, vorticity, divergence, pressure, gradient, splat, blit }
   }, [resolution, curlStrength])
+
+  // --- FluidInput (used for the one-shot init blit) ---------------------
+  // The per-frame splats are still handled inline below for performance —
+  // FluidInput is wired up here only so initialTexture can be staged into
+  // the dye buffer through its existing offscreen scene + render path.
+  const fluidInput = useMemo<FluidInput>(() => {
+    return new FluidInput(fbos.velocity, fbos.dye)
+  }, [fbos])
+
+  // Tracks whether the seed blit has already been issued; ensures the
+  // initialTexture is consumed exactly once even if the prop reference
+  // is stable and useFrame fires repeatedly.
+  const hasBakedRef = useRef<boolean>(false)
+
+  // Reusable scratch for the init tint so we don't allocate per frame
+  // before the seed has fired.
+  const initTint = useRef<THREE.Vector3>(new THREE.Vector3(1, 1, 1))
 
   // --- Cursor ref --------------------------------------------------------
   const cursorRef = useRef<CursorRef>({
@@ -391,11 +432,15 @@ export default function FluidSimulation(props: FluidSimulationProps): null {
       materials.pressure.dispose()
       materials.gradient.dispose()
       materials.splat.dispose()
+      materials.blit.dispose()
+
+      // FluidInput (its own offscreen scene + geometry)
+      fluidInput.dispose()
 
       // Geometry
       offscreen.geometry.dispose()
     }
-  }, [fbos, materials, offscreen])
+  }, [fbos, materials, offscreen, fluidInput])
 
   // --- Per-frame pipeline -----------------------------------------------
   // Reusable scratch to avoid allocation during splats.
@@ -415,6 +460,26 @@ export default function FluidSimulation(props: FluidSimulationProps): null {
   useFrame((_, delta) => {
     const dt: number = Math.min(delta, 1 / 30) // clamp huge deltas
     const prevTarget: THREE.WebGLRenderTarget | null = gl.getRenderTarget()
+
+    // 0. Seed the dye field once with the supplied initial texture.
+    // Runs before the solver so the very first advection step can act
+    // on the silhouette. After the blit, hasBakedRef latches true and
+    // this branch is skipped for the lifetime of the component.
+    if (
+      initialTexture !== undefined &&
+      initialTexture !== null &&
+      hasBakedRef.current === false
+    ) {
+      fluidInput.initFromTexture({
+        sourceTex: initialTexture,
+        tint: initTint.current,
+        opacity: 1,
+        renderer: gl,
+        dyeFBO: fbos.dye,
+        blitMaterial: materials.blit,
+      })
+      hasBakedRef.current = true
+    }
 
     // 1. Advect velocity ------------------------------------------------
     {
