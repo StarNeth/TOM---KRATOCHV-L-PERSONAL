@@ -329,7 +329,7 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       }
     }
 
-    // ════════════════════════════════════════════════════════���══════════
+    // ═══════���════════════════════════════════════════════════���══════════
     // PBR — Cook-Torrance GGX BRDF
     // Cheap arithmetic only — no noise samples.
     // ═══════════════════════════════════════════════════════════════════
@@ -672,14 +672,19 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
   const { canUseWebGL, isReady } = useWebGLSupport()
   const [hasWebGLError, setHasWebGLError] = useState(false)
 
-  // ── FLUID + TEXT HANDOFF REFS ──────────────────────────────────────
-  // initTexRef receives the baked typography texture from <TextBaker>;
-  // FluidSimulation reads it as a one-shot seed. dyeTexRef receives the
-  // live dye field from FluidSimulation each frame; FluidDisplayMesh
-  // samples it via useFrame. Both are mutated, never set via useState,
-  // so the handoff is allocation-free and never re-renders the canvas.
-  const dyeTexRef  = useRef<THREE.Texture | null>(null)
-  const initTexRef = useRef<THREE.Texture | null>(null)
+  // ── FLUID + TEXT HANDOFF ───────────────────────────────────────────
+  // dyeTexRef receives the live dye field from FluidSimulation each
+  // frame and is read by FluidDisplayMesh in useFrame — a ref keeps
+  // that fast-path allocation-free and avoids per-frame re-renders.
+  //
+  // initTex is *state*, not a ref, on purpose: FluidSimulation closes
+  // over `initialTexture` from props inside its useFrame. If we mutated
+  // a ref, the simulation would never observe the late-arriving baked
+  // texture. Setting state once (when TextBaker fires onBaked) re-renders
+  // WebGLScene exactly once and the simulation's seed branch sees the
+  // new value, latches `hasBakedRef`, and never runs again.
+  const dyeTexRef = useRef<THREE.Texture | null>(null)
+  const [initTex, setInitTex] = useState<THREE.Texture | null>(null)
 
   const shouldUseFallback =
     !forceRender && (hasWebGLError || (isReady && !canUseWebGL))
@@ -799,14 +804,14 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
           <TextBaker
             text={["TOMÁŠ", "KRATOCHVÍL"]}
             onBaked={(tex) => {
-              initTexRef.current = tex
+              setInitTex(tex)
             }}
           />
           <FluidSimulation
             resolution={512}
             pressureIterations={20}
             dissipation={0.988}
-            initialTexture={initTexRef.current ?? undefined}
+            initialTexture={initTex}
             onDyeReady={(tex) => {
               dyeTexRef.current = tex
             }}
