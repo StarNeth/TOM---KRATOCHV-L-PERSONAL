@@ -73,6 +73,16 @@ export type CoreState = {
   // ── AUDIT PANEL ──
   /** Whether the deeper audit/telemetry overlay is expanded. */
   auditOpen: boolean
+  /**
+   * Last audit/anomaly event. ONE-SHOT: producers fire `set({ audit: {...} })`
+   * once; consumers read it and may render a transient indicator. The stamp
+   * `at` (ms) is what consumers compare against to detect a NEW event — the
+   * code field is not unique.
+   *
+   *   ANOM-01 — the once-per-session FlickerLed in About.
+   *   NAV-XX  — reserved for navigation transition audits.
+   */
+  audit: { code: string; at: number } | null
 }
 
 const initial: CoreState = {
@@ -89,6 +99,7 @@ const initial: CoreState = {
   clickPulse: 0,
   handshake: "BOOT",
   auditOpen: false,
+  audit: null,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
