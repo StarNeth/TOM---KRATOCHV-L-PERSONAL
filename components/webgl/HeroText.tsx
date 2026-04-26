@@ -4,7 +4,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Text } from '@react-three/drei'
 import * as THREE from 'three'
-import { createDerivedMaterial } from 'troika-three-text'
+import { createTextDerivedMaterial as createDerivedMaterial } from 'troika-three-text'
 import { coreStateBus } from '@/lib/core-state-bus'
 
 // ─── GLSL: FBM displacement — IDENTICAL rotation matrix to scene.tsx ──────
