@@ -246,7 +246,7 @@ const MobileMenuOverlay = ({
           style={{
             color: "var(--color-bone)",
             border: "1px solid color-mix(in oklab, var(--color-bone) 25%, transparent)",
-            transition: `background ${dur.short}ms ${ease.mechanical}`,
+            transition: `background ${dur.tap}ms ${ease.mechanical}`,
           }}
         >
           <Globe className="w-3 h-3 animate-[spin_8s_linear_infinite]" />
@@ -349,7 +349,7 @@ export const Header = () => {
             className="sys-element font-display font-black text-2xl tracking-tighter uppercase leading-none"
             style={{
               color: "var(--color-bone)",
-              transition: `opacity ${dur.short}ms ${ease.mechanical}`,
+              transition: `opacity ${dur.tap}ms ${ease.mechanical}`,
             }}
           >
             TOMÁŠ K.
@@ -374,7 +374,7 @@ export const Header = () => {
             <button
               onClick={toggleLanguage}
               className="flex items-center gap-1.5 hover:opacity-60 cursor-pointer"
-              style={{ transition: `opacity ${dur.short}ms ${ease.mechanical}` }}
+              style={{ transition: `opacity ${dur.tap}ms ${ease.mechanical}` }}
             >
               <Globe className="w-3 h-3 animate-[spin_8s_linear_infinite]" />
               <span>{language === "cs" ? "CZECH" : "ENGLISH"}</span>
@@ -397,7 +397,7 @@ export const Header = () => {
                 className="flex items-center gap-3 font-sans text-sm tracking-[0.1em] uppercase py-1 cursor-pointer"
                 style={{
                   color: "var(--color-bone)",
-                  transition: `opacity ${dur.short}ms ${ease.mechanical}`,
+                  transition: `opacity ${dur.tap}ms ${ease.mechanical}`,
                 }}
               >
                 <span className="inline-flex items-baseline">
@@ -408,7 +408,7 @@ export const Header = () => {
                   style={{
                     color: "color-mix(in oklab, var(--color-bone) 35%, transparent)",
                     opacity: hoveredIdx === i ? 1 : 0.5,
-                    transition: `opacity ${dur.short}ms ${ease.mechanical}`,
+                    transition: `opacity ${dur.tap}ms ${ease.mechanical}`,
                   }}
                 >
                   {`0${i + 1}`}
