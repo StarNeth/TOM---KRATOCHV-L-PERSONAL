@@ -104,6 +104,13 @@ import { velocityBus } from "@/lib/velocity-bus"
 // Those libraries reference `window` at module init and blow up the
 // server render. See lib/cursor-bus.ts for the full rationale.
 import { cursorBus } from "@/lib/cursor-bus"
+// coreStateBus exposes the synthesized "system state" — the additive bridge
+// below subscribes to `hoveredZone` and biases the shader's existing
+// uZoneOverride / uTransition uniforms. This is purely additive — the
+// LEGACY `webgl-transition` event path is kept untouched, and the bus
+// subscription only fires when a project card hover ACTUALLY changes the
+// hoveredZone value.  Zero impact on velocity, cursor, click-pulse paths.
+import { coreStateBus } from "@/lib/core-state-bus"
 
 type LiquidProps = { isMobile: boolean; onFirstFrame: () => void }
 
@@ -183,6 +190,54 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       clickTweenRef.current = null
     }
   }, [isMobile, dpr])
+
+  // ── HOVER-ZONE BRIDGE (ADDITIVE) ────────────────────────────────────
+  // Subscribes to coreStateBus.hoveredZone (set by project cards). Writes
+  // directly into the EXISTING uZoneOverride / uTurbulence uniforms.
+  //
+  // Inviolable physics paths (velocity, cursor, click-pulse) are NOT
+  // touched. uTransition is left alone (its >0.001 branch triggers the
+  // ASCII matrix dissolve and that's reserved for /work/[id] navigation).
+  //
+  // Soft "scan-line" feel comes from a brief turbulence pulse on every
+  // zone change — the shader's existing turbulence path agitates the
+  // domain warp magnitude so the palette swap doesn't look like a hard
+  // cut. ~280ms attack, decays via the existing turbulenceRef logic.
+  useEffect(() => {
+    let lastZone = -1
+    const turbulenceTween = { kill: () => {}, _t: null as gsap.core.Tween | null }
+    const apply = (zone: number) => {
+      if (zone === lastZone) return
+      lastZone = zone
+      const mat = materialRef.current
+      if (!mat) return
+      mat.uniforms.uZoneOverride.value = zone
+      // Brief turbulence pulse — reuses the existing uTurbulence uniform so
+      // the velocity-reactive turbulence ramp & decay logic in useFrame
+      // doesn't fight us. We just nudge `target` upward and let the frame
+      // loop's asymmetric lerp settle it.
+      turbulenceTween._t?.kill()
+      turbulenceTween._t = gsap.to(turbulenceRef.current, {
+        target: 0.85,
+        duration: 0.28,
+        ease: "power2.out",
+        overwrite: "auto",
+        onComplete: () => {
+          turbulenceTween._t = gsap.to(turbulenceRef.current, {
+            target: 0,
+            duration: 0.9,
+            ease: "power2.in",
+          })
+        },
+      })
+    }
+    apply(coreStateBus.get().hoveredZone)
+    const off = coreStateBus.subscribe((s) => apply(s.hoveredZone))
+    return () => {
+      off()
+      turbulenceTween._t?.kill()
+    }
+  }, [])
 
   const uniforms = useMemo(
     () => ({
@@ -326,7 +381,7 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════���══════════
     // PBR — Cook-Torrance GGX BRDF
     // Cheap arithmetic only — no noise samples.
     // ═══════════════════════════════════════════════════════════════════
