@@ -17,9 +17,6 @@ const DICTIONARY = {
 
 export const Hero = () => {
   const containerRef = useRef<HTMLElement>(null)
-  const nameRef = useRef<HTMLHeadingElement>(null)
-  const firstRowRef = useRef<HTMLSpanElement>(null)
-  const secondRowRef = useRef<HTMLSpanElement>(null)
   const tickerRef = useRef<HTMLSpanElement>(null)
   const { language } = useLanguage()
   const content = DICTIONARY[language as keyof typeof DICTIONARY]
@@ -78,19 +75,14 @@ export const Hero = () => {
     return () => io.disconnect()
   }, [])
 
-  // Velocity-driven skew + tracking — rAF, zero re-renders, gated on visibility.
+  // Velocity-driven ticker drift — rAF, zero re-renders, gated on visibility.
+  // The h1 skew/tracking writes were removed when the title moved to WebGL;
+  // the bottom ticker remains in the DOM and still reads the velocity bus.
   useEffect(() => {
     if (!animState.ready || !isVisible) return
     let raf = 0
     const tick = () => {
-      const { normalized, intensity } = velocityBus.get()
-      const h1 = nameRef.current
-      if (h1) {
-        const skew = normalized * -4
-        const tracking = -0.04 - intensity * 0.02
-        h1.style.setProperty("--skew", `${skew}deg`)
-        h1.style.setProperty("--track", `${tracking}em`)
-      }
+      const { normalized } = velocityBus.get()
       if (tickerRef.current) {
         const drift = Math.round(normalized * 40)
         tickerRef.current.style.setProperty("--drift", `${drift}px`)
@@ -108,57 +100,19 @@ export const Hero = () => {
         !!sessionStorage.getItem("preloader_played")
 
       if (alreadyPlayed || animState.isBot) {
-        gsap.set([firstRowRef.current, secondRowRef.current], {
-          yPercent: 0,
-          opacity: 1,
-          filter: "blur(0px)",
-          clearProps: "willChange",
-        })
         gsap.set(".hero-ui", { opacity: 1, y: 0 })
       } else if (animState.ready) {
-        gsap.set([firstRowRef.current, secondRowRef.current], {
-          yPercent: 110,
-          opacity: 0,
-          filter: "blur(14px)",
-        })
         gsap.set(".hero-ui", { opacity: 0, y: 12 })
 
-        const tl = gsap.timeline()
-        tl.to(firstRowRef.current, {
-          yPercent: 0,
+        gsap.to(".hero-ui", {
           opacity: 1,
-          filter: "blur(0px)",
-          duration: 1.4,
-          ease: ease.silk,
+          y: 0,
+          duration: 0.9,
+          ease: ease.decay,
+          stagger: 0.12,
+          delay: 0.25,
         })
-          .to(
-            secondRowRef.current,
-            {
-              yPercent: 0,
-              opacity: 1,
-              filter: "blur(0px)",
-              duration: 1.4,
-              ease: ease.silk,
-            },
-            "-=1.15"
-          )
-          .to(
-            ".hero-ui",
-            {
-              opacity: 1,
-              y: 0,
-              duration: 0.9,
-              ease: ease.decay,
-              stagger: 0.12,
-            },
-            "-=0.7"
-          )
       } else {
-        gsap.set([firstRowRef.current, secondRowRef.current], {
-          yPercent: 110,
-          opacity: 0,
-          filter: "blur(14px)",
-        })
         gsap.set(".hero-ui", { opacity: 0, y: 12 })
       }
 
@@ -206,49 +160,24 @@ export const Hero = () => {
       </div>
 
       <div className="relative z-[3] flex flex-col items-center w-full max-w-[100vw] px-4 sm:px-6">
-        <h1
-          ref={nameRef}
+        <span
+          aria-label="Tomáš Kratochvíl"
+          role="heading"
+          aria-level={1}
           style={{
-            ["--skew" as any]: "0deg",
-            ["--track" as any]: "-0.04em",
-            transform: "skewY(var(--skew))",
-            letterSpacing: "var(--track)",
-            fontFeatureSettings: '"ss01", "ss02", "cv01", "ss03"',
-            willChange: "transform, letter-spacing",
-            transition: "transform 120ms linear, letter-spacing 200ms linear",
-            filter:
-              "drop-shadow(0 2px 18px rgba(0,0,0,0.65)) drop-shadow(0 0 42px rgba(0,0,0,0.40)) drop-shadow(0 0 28px rgba(255,255,255,0.06))",
-            color: "#ffffff",
+            position: "absolute",
+            width: "1px",
+            height: "1px",
+            padding: 0,
+            margin: "-1px",
+            overflow: "hidden",
+            clip: "rect(0,0,0,0)",
+            whiteSpace: "nowrap",
+            border: 0,
           }}
-          className="relative font-sans font-black leading-[0.82] uppercase text-center w-full flex flex-col items-center"
         >
-          <span className="block overflow-hidden w-full">
-            <span
-              ref={firstRowRef}
-              className="block whitespace-nowrap"
-              style={{
-                fontSize: "clamp(3.2rem, 15vw, 22rem)",
-                marginLeft: "-0.04em",
-              }}
-            >
-              TOMÁŠ
-            </span>
-          </span>
-          <span className="block overflow-hidden w-full -mt-[0.06em]">
-            <span
-              ref={secondRowRef}
-              className="block"
-              style={{
-                fontSize: "clamp(2.2rem, 10.5vw, 15rem)",
-                color: "rgba(255,255,255,0.94)",
-                marginRight: "-0.04em",
-                whiteSpace: "nowrap",
-              }}
-            >
-              KRATOCHVÍL
-            </span>
-          </span>
-        </h1>
+          Tomáš Kratochvíl
+        </span>
 
         <div
           className="hero-ui mt-10 flex items-center gap-4 font-mono text-[10px] tracking-[0.45em] uppercase text-white/60"

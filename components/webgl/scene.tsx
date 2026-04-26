@@ -98,6 +98,8 @@ import { useWebGLSupport } from "@/hooks/use-webgl-support"
 import { CSSFallbackGradient } from "./css-fallback-gradient"
 import { WebGLErrorBoundary } from "./WebGLErrorBoundary"
 import { velocityBus } from "@/lib/velocity-bus"
+import { coreStateBus } from "@/lib/core-state-bus"
+import { HeroText } from "@/components/webgl/HeroText"
 // cursorBus lives in its own file so cursor.tsx (statically imported by
 // the root layout on every route — including /work/[id]) doesn't drag
 // `three` and `@react-three/postprocessing` into the SSR module graph.
@@ -326,7 +328,7 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════���══════════
     // PBR — Cook-Torrance GGX BRDF
     // Cheap arithmetic only — no noise samples.
     // ═══════════════════════════════════════════════════════════════════
@@ -591,6 +593,8 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
     }
     trb.value += (trb.target - trb.value) * (trb.target > trb.value ? 0.18 : 0.04)
     u.uTurbulence.value = trb.value
+    // Mirror to coreStateBus so HeroText reads the EXACT same signal.
+    coreStateBus.turbulence = trb.value
 
     // ── CURSOR → SHADER ───────────────────────────────────────────────
     const c = cursorBus.get()
@@ -731,6 +735,8 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
             <planeGeometry args={[2, 2]} />
             <LiquidObsidianMaterial isMobile={isMobile} onFirstFrame={handleFirstFrame} />
           </mesh>
+
+          <HeroText />
 
           {/* ── REGRESSION 01 FIX — EffectComposer simplified on mobile ──
               Bloom `mipmapBlur` requires MRT and is disabled on mobile.
