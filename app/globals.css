@@ -47,6 +47,19 @@
 
   /* ── DEFAULT BORDER RADIUS ── */
   --radius: 0px;
+
+  /* ── SHORT-NAME ALIASES — used by the audit directive verbatim.
+   * These resolve at the cascade level so any component can write
+   * `border-color: var(--rule)` without having to know the underlying
+   * semantic token. They map onto the @theme tokens defined below.
+   */
+  --core: var(--color-bone);
+  --rule: var(--color-border);
+  --rule-strong: var(--color-dim, oklch(0.40 0 0));
+  --data: var(--color-bone);
+  --cursor-core: var(--color-bone);
+  --cursor-rule: var(--color-border);
+  --cursor-data: var(--color-bone);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

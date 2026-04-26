@@ -57,6 +57,10 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import gsap from "gsap"
+// durS — durations in seconds (GSAP-native). The materialization clip-path
+// reveal uses durS.bar (≈ 0.7s) to keep the original 750ms entrance feel
+// while replacing the brightness/blur flash with a coordinate-style wipe.
+import { durS } from "@/lib/motion"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LETTERFORM GEOMETRY — module-level pure functions, no side effects
@@ -153,6 +157,13 @@ export const Preloader = () => {
   const topRuleRef = useRef<HTMLDivElement>(null)
   const botRuleRef = useRef<HTMLDivElement>(null)
   const labelRef = useRef<HTMLDivElement>(null)
+  // Bottom-right "FISSION SEQUENCE / …" text — the right-side label flips
+  // INITIALIZING → COMPLETE at pct >= 97.
+  const fissionLabelRef = useRef<HTMLSpanElement>(null)
+  // Blueprint coordinate precursor — 8 thin rules + 3 concentric circles
+  // drawn in via clip-path / scale, fades out 80ms before the counter
+  // materializes. Pure decoration, opacity 0.04, never lingers.
+  const precursorRef = useRef<HTMLDivElement>(null)
 
   const liveRef = useRef<HTMLDivElement>(null)
 
@@ -282,6 +293,62 @@ export const Preloader = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done])
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // ACT 0 — BLUEPRINT COORDINATE PRECURSOR
+  // ═══════════════════════════════════════════════════════════════════════
+  // Plays BEFORE the counter appears.
+  //   1. 8 thin rules wipe in via clip-path over 180ms
+  //   2. 3 circles scale 0→1 staggered at 0/60/120ms
+  //   3. Group holds, then fades out over 80ms
+  //   4. Counter fades in once precursor is gone
+  // Reduced motion: skip — counter visible immediately.
+  // ═══════════════════════════════════════════════════════════════════════
+  useLayoutEffect(() => {
+    if (done) return
+    if (typeof window === "undefined") return
+
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    if (prefersReduced) {
+      if (counterRef.current) gsap.set(counterRef.current, { opacity: 1 })
+      if (precursorRef.current) gsap.set(precursorRef.current, { opacity: 0 })
+      return
+    }
+
+    const root = precursorRef.current
+    if (!root) return
+    const lines   = root.querySelectorAll<HTMLDivElement>("[data-line]")
+    const circles = root.querySelectorAll<HTMLDivElement>("[data-circle]")
+
+    const tl = gsap.timeline()
+    // Lines wipe — clip-path inset(...) → inset(0 0 0 0). The starting clip
+    // direction is set per-element in JSX (right-side reticle ticks wipe
+    // from the right; vertical lines wipe from the top); GSAP just animates
+    // every element to a fully-revealed inset.
+    tl.to(lines, {
+      clipPath: "inset(0 0 0 0)",
+      duration: 0.18,
+      ease: "power2.out",
+    }, 0)
+    // Circles scale in staggered 60ms apart. xPercent/yPercent at -50 keeps
+    // each circle centered on its top:50% left:50% origin while scale is
+    // animated; GSAP composes them into a single transform matrix.
+    tl.fromTo(circles,
+      { scale: 0, xPercent: -50, yPercent: -50 },
+      { scale: 1, xPercent: -50, yPercent: -50,
+        duration: 0.32, ease: "expo.out", stagger: 0.06,
+        transformOrigin: "center center" },
+      0
+    )
+    // Hold briefly so the eye registers the shape, then fade out.
+    tl.to(root, { opacity: 0, duration: 0.08, ease: "power2.in" }, "+=0.06")
+    // Counter materializes the moment the precursor is gone.
+    tl.to(counterRef.current, { opacity: 1, duration: 0.12, ease: "power2.out" }, "<")
+
+    return () => {
+      tl.kill()
+    }
+  }, [done])
+
   // ═════════════════════════════════════════════════════════════════════════
   // ACT I — PROGRESS TICKER
   // ═════════════════════════════════════════════════════════════════════════
@@ -307,6 +374,12 @@ export const Preloader = () => {
       if (progressBarRef.current) progressBarRef.current.style.width = `${pct}%`
       if (progressNumRef.current) progressNumRef.current.textContent = `${p3} / 100`
       if (countdownRef.current) countdownRef.current.textContent = `T-${String(100 - pct).padStart(3, "0")}`
+      if (fissionLabelRef.current) {
+        // Flip "INITIALIZING" → "COMPLETE" once at pct >= 97. Cheaper than
+        // re-comparing strings: only paint when the new text differs.
+        const next = pct >= 97 ? "FISSION SEQUENCE / COMPLETE" : "FISSION SEQUENCE / INITIALIZING"
+        if (fissionLabelRef.current.textContent !== next) fissionLabelRef.current.textContent = next
+      }
       if (counterRef.current) {
         const t = pct / 100
         const gr = 8 + t * 40
@@ -549,16 +622,21 @@ export const Preloader = () => {
     tl.to({}, { duration: 0.1 })
 
     // ── ACT IV — MATERIALIZATION (pixel positions) ─────────────────────
+    // CLIP-PATH REVEAL replaces the previous brightness/blur flash. The
+    // letterforms enter as if drawn by a coordinate plotter — bottom-up
+    // wipe via inset(100% 0 0 0) → inset(0 0 0 0). Same expo.out feel,
+    // same pixel positions, but reads as architectural rather than CGI.
+    // Duration durS.bar (~0.7s) preserves the previous 750ms cadence.
     tl.fromTo(letterTRef.current,
-      { x: -POS_ENTER, scale: 0.88, opacity: 0, filter: "brightness(12) blur(24px)" },
-      { x: -POS_ENTER, scale: 1,    opacity: 1, filter: "brightness(1) blur(0px)",
-        duration: 0.75, ease: "expo.out" },
+      { x: -POS_ENTER, scale: 1, opacity: 1, clipPath: "inset(100% 0 0 0)" },
+      { x: -POS_ENTER, scale: 1, opacity: 1, clipPath: "inset(0 0 0 0)",
+        duration: durS.bar, ease: "expo.out" },
       ">-0.08"
     )
     tl.fromTo(letterKRef.current,
-      { x:  POS_ENTER, scale: 0.88, opacity: 0, filter: "brightness(12) blur(24px)" },
-      { x:  POS_ENTER, scale: 1,    opacity: 1, filter: "brightness(1) blur(0px)",
-        duration: 0.75, ease: "expo.out" },
+      { x:  POS_ENTER, scale: 1, opacity: 1, clipPath: "inset(100% 0 0 0)" },
+      { x:  POS_ENTER, scale: 1, opacity: 1, clipPath: "inset(0 0 0 0)",
+        duration: durS.bar, ease: "expo.out" },
       "<"
     )
     tl.to(shardEls, {
@@ -598,8 +676,13 @@ export const Preloader = () => {
   }, [announce, particles])
 
   useEffect(() => {
-    if (letterTRef.current) gsap.set(letterTRef.current, { opacity: 0, x: 0, scale: 0.88 })
-    if (letterKRef.current) gsap.set(letterKRef.current, { opacity: 0, x: 0, scale: 0.88 })
+    // Letters START fully positioned + opaque but CLIPPED (inset 100%).
+    // The Act-IV tween wipes the clip down to inset 0. This guarantees no
+    // flash of unclipped letters between mount and Act IV — same anti-flash
+    // contract as the previous opacity:0 init, but compatible with the
+    // new clip-path materialization.
+    if (letterTRef.current) gsap.set(letterTRef.current, { opacity: 1, x: 0, scale: 1, clipPath: "inset(100% 0 0 0)" })
+    if (letterKRef.current) gsap.set(letterKRef.current, { opacity: 1, x: 0, scale: 1, clipPath: "inset(100% 0 0 0)" })
     const shards = shardContainerRef.current?.querySelectorAll(".pp-shard")
     if (shards) gsap.set(shards, { opacity: 0, x: 0, y: 0, rotation: 0, scale: 1 })
   }, [])
@@ -639,13 +722,56 @@ export const Preloader = () => {
             ref={topRuleRef}
             className="absolute top-10 left-10 right-10 flex items-center justify-between font-mono text-[10px] tracking-[0.55em] uppercase text-white/50"
           >
-            <span>Nuclear System</span>
+            <span>KRATOCHV&Iacute;L &middot; T. / SYSTEM ARCHITECT</span>
             <span className="tabular-nums">
               T-<span ref={countdownRef}>100</span>
             </span>
           </div>
 
           <div className="absolute inset-0 flex items-center justify-center">
+            {/* ── BLUEPRINT COORDINATE PRECURSOR ─────────────────────────
+              * 8 thin rules + 3 concentric circles, all at opacity 0.04.
+              * Lines wipe in via clip-path 0-180ms, circles scale staggered
+              * 0/60/120ms; the whole group fades over 80ms before the
+              * counter appears. Pure decoration — no aria, pointer-events
+              * none, never persists past Act 0.                            */}
+            <div
+              ref={precursorRef}
+              aria-hidden
+              className="absolute inset-0 pointer-events-none"
+              style={{ willChange: "opacity" }}
+            >
+              {/* 2 long cross-hairs through center */}
+              <div data-line className="absolute left-0 right-0 top-1/2 h-px"
+                   style={{ background: "var(--color-bone)", opacity: 0.04, clipPath: "inset(0 100% 0 0)" }} />
+              <div data-line className="absolute top-0 bottom-0 left-1/2 w-px"
+                   style={{ background: "var(--color-bone)", opacity: 0.04, clipPath: "inset(100% 0 0 0)" }} />
+              {/* 4 corner reticle ticks (1 line each) */}
+              <div data-line className="absolute top-10 left-10 h-px w-6"
+                   style={{ background: "var(--color-bone)", opacity: 0.04, clipPath: "inset(0 100% 0 0)" }} />
+              <div data-line className="absolute top-10 right-10 h-px w-6"
+                   style={{ background: "var(--color-bone)", opacity: 0.04, clipPath: "inset(0 0 0 100%)" }} />
+              <div data-line className="absolute bottom-10 left-10 h-px w-6"
+                   style={{ background: "var(--color-bone)", opacity: 0.04, clipPath: "inset(0 100% 0 0)" }} />
+              <div data-line className="absolute bottom-10 right-10 h-px w-6"
+                   style={{ background: "var(--color-bone)", opacity: 0.04, clipPath: "inset(0 0 0 100%)" }} />
+              {/* 2 mid-axis ticks on the horizontal */}
+              <div data-line className="absolute top-1/2 left-1/4 w-px h-4 -translate-y-1/2"
+                   style={{ background: "var(--color-bone)", opacity: 0.04, clipPath: "inset(100% 0 0 0)" }} />
+              <div data-line className="absolute top-1/2 right-1/4 w-px h-4 -translate-y-1/2"
+                   style={{ background: "var(--color-bone)", opacity: 0.04, clipPath: "inset(100% 0 0 0)" }} />
+              {/* 3 concentric circles. GSAP owns the transform — it will set
+                  xPercent/yPercent to -50 (centering) AND scale together. We
+                  intentionally DO NOT use Tailwind translate utilities here
+                  because GSAP would clobber them on the first tween tick. */}
+              <div data-circle className="absolute top-1/2 left-1/2 rounded-full"
+                   style={{ width: "120px", height: "120px", border: "1px solid var(--color-bone)", opacity: 0.04 }} />
+              <div data-circle className="absolute top-1/2 left-1/2 rounded-full"
+                   style={{ width: "240px", height: "240px", border: "1px solid var(--color-bone)", opacity: 0.04 }} />
+              <div data-circle className="absolute top-1/2 left-1/2 rounded-full"
+                   style={{ width: "360px", height: "360px", border: "1px solid var(--color-bone)", opacity: 0.04 }} />
+            </div>
+
             <div
               ref={counterRef}
               className="relative font-syne font-black text-white leading-none tabular-nums pointer-events-none select-none"
@@ -653,7 +779,8 @@ export const Preloader = () => {
                 fontSize: "clamp(10rem, 38vw, 34rem)",
                 letterSpacing: "-0.08em",
                 fontFeatureSettings: '"tnum","ss01"',
-                willChange: "letter-spacing, filter",
+                willChange: "letter-spacing, filter, opacity",
+                opacity: 0,
               }}
             >
               <span
@@ -684,18 +811,25 @@ export const Preloader = () => {
               aria-hidden="true"
               className="absolute inset-0 flex items-center justify-center pointer-events-none"
             >
-              {particles.map((p, i) => (
-                <div
-                  key={i}
-                  className="pp-shard absolute bg-white"
-                  style={{
-                    width: `${p.size}px`,
-                    height: `${p.size}px`,
-                    borderRadius: "1px",
-                    willChange: "transform, opacity",
-                  }}
-                />
-              ))}
+              {particles.map((p, i) => {
+                // 1-in-7 amber distribution. Modular index instead of random
+                // so the amber dots fall at deterministic positions across
+                // the T/K shard grid — never bunched, never absent.
+                const isAmber = i % 7 === 0
+                return (
+                  <div
+                    key={i}
+                    className={isAmber ? "pp-shard absolute" : "pp-shard absolute bg-white"}
+                    style={{
+                      width: `${p.size}px`,
+                      height: `${p.size}px`,
+                      borderRadius: "1px",
+                      willChange: "transform, opacity",
+                      ...(isAmber ? { backgroundColor: "rgba(245,166,35,0.85)" } : null),
+                    }}
+                  />
+                )
+              })}
             </div>
 
             <span
@@ -728,7 +862,7 @@ export const Preloader = () => {
           >
             <span ref={progressNumRef}>000 / 100</span>
             <div ref={labelRef}>
-              <span className="text-white/40">Init · Kinetic Layer</span>
+              <span ref={fissionLabelRef} className="text-white/40">FISSION SEQUENCE / INITIALIZING</span>
             </div>
           </div>
 
