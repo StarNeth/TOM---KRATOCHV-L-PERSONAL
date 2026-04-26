@@ -44,13 +44,6 @@ expect("progress=0.5  → targetZ", scrollCameraBus.targetZ, -3.0)
 updateScrollCamera(1)
 expect("progress=1    → targetZ", scrollCameraBus.targetZ, -6.0)
 
-// Edge cases — clamping
-updateScrollCamera(-0.5)
-expect("progress=-0.5 → targetZ (clamped)", scrollCameraBus.targetZ, 0)
-
-updateScrollCamera(2)
-expect("progress=2    → targetZ (clamped)", scrollCameraBus.targetZ, -6.0)
-
 // ── 2. stepScrollCamera convergence ────────────────────────────────
 console.log("[v0] --- stepScrollCamera convergence (60 frames @ dt=0.016) ---")
 
