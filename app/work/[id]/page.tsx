@@ -21,6 +21,9 @@ const WebGLScene = React.memo(WebGLSceneDynamic)
 
 import { useLanguage } from "@/components/navigation/language-toggle"
 import { ease } from "@/lib/easing"
+// coreStateBus — work-detail flips handshake to NAVIGATING the moment
+// triggerNextProject begins, so HUDs read HANDSHAKE during the GSAP exit.
+import { coreStateBus } from "@/lib/core-state-bus"
 
 const PROJECT_ORDER = ["shuxianglou", "kings-barber"]
 
@@ -227,6 +230,13 @@ export default function ProjectDetail() {
     if (isTransitioning.current || !project) return
     isTransitioning.current = true
     setAdvancing(true) // mobile button flips to "LOADING..." immediately
+
+    // Handshake: announce we are mid-NAV so any HUD surface listening to
+    // coreStateBus.handshake (FrameSystem bottom-left, telemetry) flips to
+    // HANDSHAKE for the duration of the GSAP exit + curtain. The /work/{n}
+    // route mount will set its own contract on entry — we only own the
+    // outgoing edge here.
+    coreStateBus.set({ handshake: "NAVIGATING" })
 
     const currentIndex = PROJECT_ORDER.indexOf(slug)
     const nextSlug = PROJECT_ORDER[(currentIndex + 1) % PROJECT_ORDER.length]

@@ -194,6 +194,7 @@ export const Contact = () => {
     <section
       ref={sectionRef}
       id="contact"
+      data-section-index="4"
       className="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 md:px-12 z-10 bg-transparent overflow-hidden perspective-[1000px]"
       style={{ color: "var(--core)" }}
     >

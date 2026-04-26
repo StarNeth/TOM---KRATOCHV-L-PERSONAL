@@ -191,6 +191,7 @@ export const Hero = () => {
   return (
     <section
       ref={containerRef}
+      data-section-index="0"
       className="relative h-[100svh] w-full flex flex-col justify-center items-center z-10 perspective-[1000px] overflow-hidden"
       style={{ ["--depth" as any]: 0 }}
     >

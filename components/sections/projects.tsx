@@ -390,7 +390,7 @@ export const Projects = () => {
     { scope: containerRef, dependencies: [language] },
   )
 
-  // ───────────────────────────────────────────────────────────────────────────
+  // ──────────────────────────���────────────────────────────────────────────────
   // MEMORY-SAFE RGB SPLIT GLITCH + SLOW ZOOM + SCAN-LINE SWEEP + ZONE BUS
   //
   // Hover responsibilities (in order, all on the SAME mouseenter event):
@@ -555,6 +555,7 @@ export const Projects = () => {
       ref={containerRef}
       id="work"
       data-section="work"
+      data-section-index="2"
       className="relative w-full h-[100svh] bg-transparent perspective-[2200px] overflow-hidden"
     >
       {/* Background WORK/LOG ordinal — anchored at the section back, knocked

@@ -61,6 +61,10 @@ import gsap from "gsap"
 // reveal uses durS.bar (≈ 0.7s) to keep the original 750ms entrance feel
 // while replacing the brightness/blur flash with a coordinate-style wipe.
 import { durS } from "@/lib/motion"
+// coreStateBus — preloader is the AUTHORITATIVE source of the BOOT→IDLE
+// handshake transition. Velocity driver only flips it on first non-zero
+// scroll velocity now, so the preloader's portal collapse owns the moment.
+import { coreStateBus } from "@/lib/core-state-bus"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LETTERFORM GEOMETRY — module-level pure functions, no side effects
@@ -664,9 +668,23 @@ export const Preloader = () => {
     }, "<")
 
     // ── ACT VII — PORTAL SCALE ─────────────────────────────────────────
+    // The portal collapse is the SYSTEM HANDSHAKE moment — once the
+    // letterforms have detonated past the viewport, the rest of the page
+    // is officially "online". Fire BOOT → IDLE here so the FrameSystem
+    // bottom-left readout flips from BOOT to SECURE in the same beat the
+    // hero materializes. The velocity driver no longer races to do this
+    // on its first tick.
     .to([letterTRef.current, letterKRef.current], {
       scale: 100, opacity: 0, filter: "blur(40px)",
       duration: 0.85, ease: "expo.out",
+      onComplete: () => {
+        // Guard: only step if we are still the BOOT-era source. If something
+        // else has already advanced the handshake (e.g., NAVIGATING from a
+        // /work navigation interrupting the preloader), don't clobber it.
+        if (coreStateBus.get().handshake === "BOOT") {
+          coreStateBus.set({ handshake: "IDLE" })
+        }
+      },
     }, "+=0.03")
     .to(stageRef.current, { opacity: 0, duration: 0.80, ease: "power2.out" }, "<")
     .to(rootRef.current, {

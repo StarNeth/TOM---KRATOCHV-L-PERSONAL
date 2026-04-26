@@ -310,7 +310,7 @@ export const About = () => {
     <section
       ref={containerRef}
       id="about"
-      data-section-index="2"
+      data-section-index="1"
       className="relative w-full text-[var(--color-bone)] py-24 md:py-32 lg:py-48 z-10 overflow-hidden bg-transparent"
     >
       {/* Velocity-skewed left rule. Subtle. Sells the "instrumented" tone. */}

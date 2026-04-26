@@ -139,8 +139,13 @@ export const VelocityDriver = () => {
       })
 
       // ③ Handshake transitions, velocity-driven.
-      if (handshake === "BOOT") setHandshake("IDLE")
+      // The Preloader's Act VII portal collapse is the AUTHORITATIVE source
+      // of BOOT → IDLE. We only fall back here if the user has actually
+      // scrolled (vAbs > 0) — that way a session with the preloader
+      // session-storage flag set still gets out of BOOT, but the preloader
+      // itself can't be raced to IDLE before its own onComplete fires.
       const vAbs = Math.abs(v.normalized)
+      if (handshake === "BOOT" && vAbs > 0) setHandshake("IDLE")
       if (vAbs > NAV_THRESHOLD && lastVAbs <= NAV_THRESHOLD) {
         setHandshake("NAVIGATING")
         releaseAt = 0

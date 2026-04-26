@@ -45,6 +45,16 @@
   --frame-rule: 1px;
   --frame-pad:  clamp(0.75rem, 1.5vw, 1.5rem);
 
+  /* ── HEADER GEOMETRY ──
+   * Single source of truth for the visible header strip's vertical extent.
+   * The fixed nav (header.tsx) lives at top:0 with py-7/py-9; this height
+   * tracks the bottom edge of the brand+status row that the FrameSystem's
+   * progress hairline mates with. Mobile is more compact than desktop.
+   * Updated at the breakpoint below — keep them in sync if header padding
+   * ever moves.
+   */
+  --header-height: 5.25rem;
+
   /* ── DEFAULT BORDER RADIUS ── */
   --radius: 0px;
 
@@ -113,6 +123,13 @@
   --color-dim-strong:           oklch(0.55 0 0);
 
   --radius: var(--radius);
+}
+
+/* ── HEADER GEOMETRY: desktop scale ── */
+@media (min-width: 768px) {
+  :root {
+    --header-height: 6.5rem;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
