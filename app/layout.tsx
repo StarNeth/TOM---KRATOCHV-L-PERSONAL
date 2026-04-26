@@ -8,7 +8,10 @@ import { Preloader } from "@/components/ui/preloader";
 import { DynamicFavicon } from "@/components/dynamic-favicon";
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { DelayedRenderer } from "@/components/providers/delayed-renderer";
-import { VelocityDriver } from "@/components/providers/velocity-driver"; 
+import { VelocityDriver } from "@/components/providers/velocity-driver";
+import { InstrumentDriver } from "@/components/providers/instrument-driver";
+import { FrameSystem } from "@/components/frame-system";
+import { TelemetryPanel } from "@/components/telemetry-panel";
 
 const syne = Syne({ subsets: ["latin"], weight: ["400", "700", "800"], variable: "--font-syne", display: "swap" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
@@ -77,7 +80,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <LanguageProvider>
           <LenisProvider>
             <VelocityDriver />
+            <InstrumentDriver />
             {children}
+            <FrameSystem />
+            <TelemetryPanel />
             <DynamicFavicon />
           </LenisProvider>
         </LanguageProvider>

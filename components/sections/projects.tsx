@@ -412,7 +412,10 @@ export const Projects = () => {
             // Kill any prior timeline for this index before registering a new one.
             timelines.get(i)?.kill()
 
-            const tl = gsap.timeline({ repeat: -1, repeatDelay: 2.2 })
+            // Glitch cadence pulled back per the restraint pass — the burst should
+    // feel like a rare event, not a recurring tic. ~4s between firings keeps
+    // the per-card character intact without crowding the eye.
+    const tl = gsap.timeline({ repeat: -1, repeatDelay: 4.0 })
             tl.set([cR, cC], { opacity: 0.9 })
               .to(
                 cR,
@@ -578,13 +581,20 @@ export const Projects = () => {
                 transformStyle: "preserve-3d",
               }}
             >
+              {/* Background ordinal — pulled hard into the corner so the
+                  glyph bleeds off the top-left silhouette of the card.
+                  Opacity 0.04: present as a watermark, never as decoration. */}
               <div
-                className="absolute -top-8 md:-top-12 -left-2 md:-left-6 z-0 pointer-events-none hidden md:block"
+                className="absolute -top-[0.35em] -left-[0.18em] z-0 pointer-events-none hidden md:block"
                 style={{ transform: "translateZ(-80px)" }}
+                aria-hidden
               >
                 <span
-                  className="font-syne font-black uppercase tracking-[-0.04em] leading-none text-white/10"
-                  style={{ fontSize: "clamp(6rem, 10vw, 12rem)" }}
+                  className="font-syne font-black uppercase tracking-[-0.04em] leading-none"
+                  style={{
+                    fontSize: "clamp(8rem, 14vw, 18rem)",
+                    color: "rgba(255,255,255,0.04)",
+                  }}
                 >
                   {p.id}
                 </span>
@@ -598,12 +608,17 @@ export const Projects = () => {
                 draggable={false}
                 aria-label={`View case study for ${p.title}`}
                 data-cursor="hover"
-                className="relative block w-full h-full rounded-xl md:rounded-[2rem] overflow-hidden bg-[#050505] pointer-events-auto cursor-pointer"
+                className="project-card-link relative block w-full h-full overflow-hidden pointer-events-auto cursor-pointer"
                 style={{
                   // Signal-strength border + glow — driven from the rAF tick.
+                  // Hard rectangle. No corner radius. The shadow stays for
+                  // depth but gives up its softness; the silhouette is now
+                  // a measured rectangle, not a pillowed card.
                   ["--border-opacity" as any]: 0.1,
                   ["--border-glow" as any]: "0px",
+                  background: "var(--void)",
                   border: "1px solid rgba(255,255,255,var(--border-opacity, 0.1))",
+                  borderRadius: 0,
                   boxShadow:
                     "0 40px 80px rgba(0,0,0,0.9), 0 0 var(--border-glow, 0px) rgba(255,255,255,0.35)",
                 }}
@@ -695,12 +710,15 @@ export const Projects = () => {
                     Text nodes are written every frame from the exact values
                     driving rotateY/skewX/translateZ. The label and the
                     geometry share one source of truth. */}
+                {/* HUD — section header removed. The data is the label.
+                    PBR/GGX is the one static row: a quiet declaration of
+                    the renderer's material model that anchors the live
+                    numerics in something the eye can rest on. */}
                 <div
-                  className="absolute top-6 right-6 md:top-10 md:right-10 z-20 pointer-events-none font-mono text-[9px] tracking-[0.2em] uppercase text-white/70 backdrop-blur-sm bg-black/30 border border-white/10 px-3 py-2 rounded-sm"
-                  style={{ fontVariantNumeric: "tabular-nums" }}
+                  className="absolute top-6 right-6 md:top-10 md:right-10 z-20 pointer-events-none font-mono text-[9px] tracking-[0.2em] uppercase text-white/70 backdrop-blur-sm bg-black/30 border border-white/10 px-3 py-2"
+                  style={{ fontVariantNumeric: "tabular-nums", borderRadius: 0 }}
                   aria-hidden
                 >
-                  <div className="text-white/40 mb-1.5">PROJ · RENDER · MATRIX</div>
                   <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
                     <span className="text-white/40">ROT_Y</span>
                     <span
@@ -738,6 +756,8 @@ export const Projects = () => {
                     >
                       0%
                     </span>
+                    <span className="text-white/40">SHADER</span>
+                    <span className="text-right text-white/80">PBR/GGX</span>
                   </div>
                 </div>
 
@@ -791,7 +811,53 @@ export const Projects = () => {
         ))}
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `.transform-style-3d { transform-style: preserve-3d; }` }} />
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .transform-style-3d { transform-style: preserve-3d; }
+
+            /*
+             * SCAN-LINE HOVER — a single 1px rule traverses the card top to
+             * bottom on hover-enter. One traversal per enter event, then it
+             * is gone. The line is a pseudo-element so the JSX tree stays
+             * clean and the spring/HUD wiring is not disturbed.
+             *
+             * Duration: 1.4s — the project's "cinematic" tempo. Slow enough
+             * to read as a deliberate gesture, fast enough not to overstay.
+             * Easing: cubic-bezier(0.22, 1, 0.36, 1) — the same silk curve
+             * the rest of the surface speaks in.
+             */
+            .project-card-link::before {
+              content: "";
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 1px;
+              background: rgba(255, 255, 255, 0.55);
+              transform: translateY(0);
+              opacity: 0;
+              pointer-events: none;
+              z-index: 30;
+              will-change: transform, opacity;
+            }
+            @media (hover: hover) {
+              .project-card-link:hover::before {
+                animation: project-card-scan 1400ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+              }
+            }
+            @keyframes project-card-scan {
+              0%   { transform: translateY(0);     opacity: 0;   }
+              8%   {                                opacity: 1;   }
+              92%  {                                opacity: 1;   }
+              100% { transform: translateY(100%);  opacity: 0;   }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .project-card-link:hover::before { animation: none; }
+            }
+          `,
+        }}
+      />
     </section>
   )
 }

@@ -1,28 +1,110 @@
 @import "tailwindcss";
 
-/* Custom easing tokens exposed to CSS transitions */
+/* ═══════════════════════════════════════════════════════════════════════
+ * MATERIAL TOKENS — REVISION 03
+ *
+ * The UI has no color of its own. The WebGL produces the spectrum;
+ * the DOM is the measurement apparatus. Below are the material constants
+ * that constitute that apparatus. There is one controlled exception
+ * (--critical) used in exactly one place to create visual tension.
+ * ═══════════════════════════════════════════════════════════════════════ */
 :root {
+  /* Easings — physical metaphors */
   --ease-silk: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-mechanical: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-mechanical: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-decay: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-expo-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Materials */
+  --void: #020203;
+  --glass: rgba(2, 2, 3, 0.72);
+  --glass-heavy: rgba(2, 2, 3, 0.92);
+
+  /* Type registers */
+  --signal: rgba(255, 255, 255, 0.95);
+  --text-primary: rgba(255, 255, 255, 0.72);
+  --text-data: rgba(255, 255, 255, 0.40);
+  --text-dim: rgba(255, 255, 255, 0.18);
+  --text-whisper: rgba(255, 255, 255, 0.06);
+
+  /* Structural rules */
+  --rule: rgba(255, 255, 255, 0.08);
+  --rule-active: rgba(255, 255, 255, 0.22);
+  --rule-faint: rgba(255, 255, 255, 0.04);
+
+  /* The single controlled saturated color. Used once. Section 6D. */
+  --critical: rgba(255, 42, 0, 0.85);
+
+  /* Structural coupling outputs — written by lib/structural-coupling.ts.
+     Default to zero so layout is identical when the rAF is paused. */
+  --coupling-nav: 0px;
+  --coupling-hero-sub: 0px;
+  --coupling-spec: 0px;
+  --coupling-gap: 0px;
+  --coupling-aperture: 0px;
+  --frame-opacity: 0.10;
+  --energy: 0;
 }
 
-/* Replace the hand-rolled text-hero numbers with something that actually hurts */
-.text-hero {
-  font-size: clamp(4rem, 22vw, 28rem);
-  line-height: 0.82;
-  letter-spacing: -0.06em;
-  font-weight: 900;
-  font-feature-settings: "ss01", "ss02", "cv01";
+/* Typography registers — Section 3 */
+.type-mono-micro {
+  font-family: var(--font-mono), monospace;
+  font-size: 9px;
+  letter-spacing: 0.40em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+.type-mono-micro-7 { font-family: var(--font-mono), monospace; font-size: 7px;  letter-spacing: 0.55em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.type-mono-micro-8 { font-family: var(--font-mono), monospace; font-size: 8px;  letter-spacing: 0.45em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.type-mono-micro-10 { font-family: var(--font-mono), monospace; font-size: 10px; letter-spacing: 0.30em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+
+/* The narrative exception — Instrument Serif italic */
+.type-narrative {
+  font-family: var(--font-instrument), serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(1.15rem, 2.2vw, 1.85rem);
+  line-height: 1.55;
+  color: var(--text-primary);
 }
 
-/* Optional: kill the `cursor: none !important` on inputs so textareas work */
+/* The precision interaction — the only hover state.
+   A 1px line draws from the left, retracts from the right.
+   Section 4.   */
+.precision-line {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  transition: color 240ms var(--ease-expo-out);
+}
+.precision-line::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  height: 1px;
+  width: 0%;
+  background: var(--signal);
+  transition: width 240ms var(--ease-expo-out);
+}
+.precision-line:hover::after,
+.precision-line[data-active="true"]::after {
+  width: 100%;
+}
+.precision-line:not(:hover)[data-active="false"]::after,
+.precision-line:not(:hover):not([data-active="true"])::after {
+  /* On leave: retract from right at ~160ms */
+  transition: width 160ms var(--ease-decay);
+  transform-origin: right;
+}
+
+/* Inputs / textareas keep a real cursor */
 input, textarea, [contenteditable="true"] {
   cursor: text !important;
 }
 
 html, body {
-  overflow-x: hidden; /* Zakáže posouvání do stran (horizontal scroll) */
+  overflow-x: hidden;
   width: 100%;
   position: relative;
 }
@@ -32,53 +114,46 @@ html, body {
     -webkit-font-smoothing: subpixel-antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    background-color: #030303;
+    background-color: var(--void);
   }
-  
-  /* ABSOLUTNÍ SMRT PRO SYSTÉMOVÉ KURZORY A SCROLLBARY */
+
   * {
     cursor: none !important;
-    scrollbar-width: none !important; /* Firefox */
-    -ms-overflow-style: none !important; /* IE and Edge */
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
   }
-  
-  *::-webkit-scrollbar {
-    display: none !important; /* Chrome, Safari and Opera */
-  }
+
+  *::-webkit-scrollbar { display: none !important; }
 }
 
 @theme inline {
   --font-sans: "Syne", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
+  --font-serif: "Instrument Serif", serif;
 
-  --color-background: oklch(0.035 0 0);
+  --color-background: oklch(0.020 0 0);
   --color-foreground: oklch(0.92 0 0);
   --color-card: oklch(0.06 0 0);
   --color-card-foreground: oklch(0.92 0 0);
   --color-popover: oklch(0.06 0 0);
   --color-popover-foreground: oklch(0.92 0 0);
   --color-primary: oklch(0.92 0 0);
-  --color-primary-foreground: oklch(0.035 0 0);
+  --color-primary-foreground: oklch(0.020 0 0);
   --color-secondary: oklch(0.12 0 0);
   --color-secondary-foreground: oklch(0.92 0 0);
   --color-muted: oklch(0.18 0 0);
   --color-muted-foreground: oklch(0.45 0 0);
-  --color-accent: oklch(0.035 0 0);
+  --color-accent: oklch(0.020 0 0);
   --color-accent-foreground: oklch(0.92 0 0);
   --color-destructive: oklch(0.55 0.2 25);
   --color-border: oklch(0.16 0 0);
   --color-input: oklch(0.12 0 0);
   --color-ring: oklch(0.45 0 0);
   --radius: 0px;
-
-  --color-obsidian: oklch(0.02 0 0);
-  --color-dim: oklch(0.35 0 0);
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
 
   html {
     @apply bg-background text-foreground antialiased;
@@ -91,29 +166,19 @@ html, body {
   }
 
   ::selection {
-    @apply bg-foreground text-background;
+    background: var(--signal);
+    color: var(--void);
   }
 }
 
 /* Lenis */
 html.lenis,
-html.lenis body {
-  height: auto;
-}
+html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
 
-.lenis.lenis-smooth {
-  scroll-behavior: auto !important;
-}
-
-.lenis.lenis-smooth [data-lenis-prevent] {
-  overscroll-behavior: contain;
-}
-
-.lenis.lenis-stopped {
-  overflow: hidden;
-}
-
-/* Grain */
+/* Grain — kept, very faint */
 .grain {
   position: fixed;
   inset: 0;
@@ -123,29 +188,7 @@ html.lenis body {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* Text styles */
-.text-hero {
-  font-size: clamp(3rem, 14vw, 13rem);
-  line-height: 0.85;
-  letter-spacing: -0.04em;
-  font-weight: 700;
-}
-
-.text-hero-sub {
-  font-size: clamp(2rem, 8vw, 7rem);
-  line-height: 0.9;
-  letter-spacing: -0.03em;
-  font-weight: 400;
-}
-
-.text-section {
-  font-size: clamp(2.5rem, 6vw, 5rem);
-  line-height: 1;
-  letter-spacing: -0.03em;
-  font-weight: 600;
-}
-
-/* WebGL */
+/* WebGL canvas positioning — the substrate */
 .webgl-canvas {
   position: fixed !important;
   inset: 0;
@@ -153,70 +196,36 @@ html.lenis body {
   pointer-events: none;
 }
 
-.content-layer {
-  position: relative;
-  z-index: 10;
-}
+.content-layer { position: relative; z-index: 10; }
 
-/* Line animation */
-.line-reveal {
-  position: relative;
-  display: inline-block;
-}
-
-.line-reveal::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 1px;
-  background: currentColor;
-  transform: scaleX(0);
-  transform-origin: right;
-  transition: transform 0.5s cubic-bezier(0.65, 0, 0.35, 1);
-}
-
-.line-reveal:hover::after {
-  transform: scaleX(1);
-  transform-origin: left;
-}
-
-/* Cursor */
+/* Cursor — keep mix-blend-difference */
 .cursor-dot {
   @apply fixed pointer-events-none z-[10000] mix-blend-difference;
   transform: translate(-50%, -50%);
 }
 
 /* Scrollbar hide */
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Focus rings — accessibility contract */
+@layer base {
+  :focus-visible {
+    outline: 1px solid rgba(255, 255, 255, 0.60);
+    outline-offset: 3px;
+  }
 }
 
-/* Project card */
-.project-image {
-  transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.project-card:hover .project-image {
-  transform: scale(1.05);
-}
-
-/* Clip reveal */
+/* Reveal: clip-path is the primary mechanism — Section 4.
+   The metaphor: a measurement plate being lifted.   */
 .clip-reveal {
   clip-path: inset(0 0 100% 0);
-  transition: clip-path 1s cubic-bezier(0.77, 0, 0.175, 1);
+  will-change: clip-path;
+  transition: clip-path 600ms var(--ease-expo-out);
 }
+.clip-reveal.revealed { clip-path: inset(0 0 0% 0); }
 
-.clip-reveal.revealed {
-  clip-path: inset(0 0 0 0);
-}
-
-/* Split text char */
+/* Char split — kept; used by the projects entry */
 .char {
   display: inline-block;
   transform: translateY(100%);
@@ -224,49 +233,31 @@ html.lenis body {
 }
 
 /* Horizontal scroll */
-.horizontal-section {
-  display: flex;
-  flex-wrap: nowrap;
-}
+.horizontal-section { display: flex; flex-wrap: nowrap; }
 
-/* Magnetic area */
-.magnetic {
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* WebGL CSS Fallback Gradient Animations */
+/* ── ASCETIC GRADIENT DRIFTS for fallback gradient (kept) ────────────── */
 @keyframes gradient-shift {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  25% {
-    transform: translate(-2%, 1%) scale(1.02);
-  }
-  50% {
-    transform: translate(1%, -1%) scale(1.01);
-  }
-  75% {
-    transform: translate(-1%, 2%) scale(1.03);
-  }
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25%      { transform: translate(-2%, 1%) scale(1.02); }
+  50%      { transform: translate(1%, -1%) scale(1.01); }
+  75%      { transform: translate(-1%, 2%) scale(1.03); }
 }
-
 @keyframes gradient-pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.3;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.2;
-  }
+  0%, 100% { transform: scale(1);   opacity: 0.30; }
+  50%      { transform: scale(1.1); opacity: 0.20; }
 }
+.animate-gradient-shift { animation: gradient-shift 20s ease-in-out infinite; will-change: transform; }
+.animate-gradient-pulse { animation: gradient-pulse 8s ease-in-out infinite; will-change: transform, opacity; }
 
-.animate-gradient-shift {
-  animation: gradient-shift 20s ease-in-out infinite;
-  will-change: transform;
-}
-
-.animate-gradient-pulse {
-  animation: gradient-pulse 8s ease-in-out infinite;
-  will-change: transform, opacity;
+/* Reduced motion — disable structural coupling visual shifts */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --coupling-nav: 0px !important;
+    --coupling-hero-sub: 0px !important;
+    --coupling-spec: 0px !important;
+    --coupling-gap: 0px !important;
+    --coupling-aperture: 0px !important;
+  }
+  .clip-reveal { transition: opacity 220ms ease-out; clip-path: none; opacity: 0; }
+  .clip-reveal.revealed { opacity: 1; }
 }

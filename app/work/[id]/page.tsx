@@ -102,6 +102,12 @@ export default function ProjectDetail() {
     return () => cancelAnimationFrame(id)
   }, [])
 
+  // ADVANCE SEQUENCE press-state — flips the mobile button label to
+  // "LOADING…" the instant the user commits, before the WebGL transition
+  // has even acknowledged the click. The state lives in this component
+  // because the existing `triggerNextProject` is a closure here.
+  const [advanceLoading, setAdvanceLoading] = useState(false)
+
   useGSAP(
     () => {
       if (!project) return
@@ -310,7 +316,11 @@ export default function ProjectDetail() {
                   {project.techStack.map((tech, i) => (
                     <span
                       key={i}
-                      className="px-4 py-2 border border-white/20 rounded-full font-mono text-[10px] tracking-widest uppercase text-white/70 bg-transparent backdrop-blur-sm"
+                      className="px-4 py-2 font-mono text-[10px] tracking-widest uppercase text-white/70 bg-transparent backdrop-blur-sm"
+                      style={{
+                        border: "1px solid rgba(255,255,255,0.20)",
+                        borderRadius: 0,
+                      }}
                     >
                       {tech}
                     </span>
@@ -336,11 +346,28 @@ export default function ProjectDetail() {
                       className="absolute inset-0 bg-white scale-x-0 origin-left group-hover:scale-x-100 -z-10 rounded-full -mx-4 px-4"
                       style={{ transition: `transform 500ms ${ease.silk}` }}
                     />
-                    <span
-                      className="font-mono text-sm group-hover:translate-x-1 group-hover:-translate-y-1 relative z-10 group-hover:text-black"
-                      style={{ transition: `transform 500ms ${ease.silk}, color 500ms ${ease.mechanical}` }}
-                    >
-                      ↗
+                    {/*
+                      Arrow crossfade — the at-rest icon is the diagonal
+                      ↗ (an external destination, off-page). On hover the
+                      glyph crossfades to → (commitment, forward motion).
+                      Two stacked spans share the same grid cell; only
+                      opacity is animated, so kerning never shifts.
+                    */}
+                    <span className="relative z-10 inline-grid font-mono text-sm leading-none">
+                      <span
+                        className="col-start-1 row-start-1 opacity-100 group-hover:opacity-0 group-hover:text-black"
+                        style={{ transition: `opacity 320ms ${ease.silk}, color 500ms ${ease.mechanical}` }}
+                        aria-hidden="true"
+                      >
+                        ↗
+                      </span>
+                      <span
+                        className="col-start-1 row-start-1 opacity-0 group-hover:opacity-100 group-hover:text-black"
+                        style={{ transition: `opacity 320ms ${ease.silk}, color 500ms ${ease.mechanical}` }}
+                        aria-hidden="true"
+                      >
+                        →
+                      </span>
                     </span>
                   </a>
                 </div>
@@ -349,9 +376,12 @@ export default function ProjectDetail() {
 
             <div className="mac-window-wrapper col-span-1 lg:col-span-7 relative h-[60vh] lg:h-[75vh] w-full z-[150] mt-10 lg:mt-0">
               <div
-                className="absolute top-0 left-0 w-full h-full overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.7)] lg:shadow-[0_60px_120px_rgba(0,0,0,0.85)] bg-[#050505] border border-white/10 flex flex-col rounded-[2rem] lg:rounded-[2.5rem]"
+                className="mac-window-crt absolute top-0 left-0 w-full h-full overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.7)] lg:shadow-[0_60px_120px_rgba(0,0,0,0.85)] bg-[#050505] border border-white/10 flex flex-col rounded-[2rem] lg:rounded-[2.5rem]"
               >
-                <div className="w-full h-10 lg:h-12 flex-shrink-0 border-b border-white/5 flex items-center justify-between px-4 lg:px-6 bg-[#111111]/95 backdrop-blur-md group/mac relative z-10 cursor-default">
+                <div
+                  className="w-full h-10 lg:h-12 flex-shrink-0 border-b border-white/5 flex items-center justify-between px-4 lg:px-6 group/mac relative z-10 cursor-default"
+                  style={{ background: "rgba(8, 8, 10, 1.0)" }}
+                >
                   <div className="flex gap-2 lg:gap-2.5">
                     {/* Červené zavře projekt a vrátí na Home */}
                     <button
@@ -377,8 +407,23 @@ export default function ProjectDetail() {
                       </span>
                     </div>
                   </div>
-                  <div className="font-mono text-[8px] lg:text-[9px] text-white/30 tracking-widest uppercase pointer-events-none">
-                    {new URL(project.liveUrl === "#" ? "https://internal.system" : project.liveUrl).hostname}
+                  {/* Title bar centerpiece: hostname plus a static LIVE
+                      PREVIEW tag. No pulsing dot — the label asserts state
+                      once and does not negotiate. */}
+                  <div className="flex items-center gap-3 lg:gap-4 pointer-events-none">
+                    <span className="font-mono text-[8px] lg:text-[9px] text-white/30 tracking-widest uppercase">
+                      {new URL(project.liveUrl === "#" ? "https://internal.system" : project.liveUrl).hostname}
+                    </span>
+                    <span
+                      className="font-mono text-[8px] lg:text-[9px] tracking-[0.3em] uppercase px-2 py-0.5 hidden sm:inline-block"
+                      style={{
+                        color: "rgba(255,255,255,0.7)",
+                        border: "1px solid rgba(255,255,255,0.18)",
+                        borderRadius: 0,
+                      }}
+                    >
+                      Live Preview
+                    </span>
                   </div>
                   <div className="w-10 lg:w-12" />
                 </div>
@@ -406,15 +451,37 @@ export default function ProjectDetail() {
           </div>
 
           <div className="desktop-hide w-full flex justify-center mt-16 ui-element z-[200]">
+            {/*
+              Mobile-only advance button. The label is system-instruction
+              uppercase, intentionally untranslated — "ADVANCE SEQUENCE" is
+              not copy, it is a command. On press, the label flips to
+              "LOADING..." and the button disables itself; the next-project
+              transition runs to completion regardless of further taps.
+            */}
             <button
-              onClick={triggerNextProject}
-              className="group flex flex-col items-center gap-4 text-white/50 hover:text-white pointer-events-auto outline-none"
+              onClick={() => {
+                if (advanceLoading) return
+                setAdvanceLoading(true)
+                triggerNextProject()
+              }}
+              disabled={advanceLoading}
+              aria-busy={advanceLoading}
+              aria-label={advanceLoading ? "Loading next project" : "Advance sequence"}
+              className="group flex flex-col items-center gap-4 text-white/50 hover:text-white pointer-events-auto outline-none disabled:opacity-70"
               style={{ transition: `color 400ms ${ease.mechanical}` }}
             >
-              <span className="font-mono text-[10px] tracking-[0.4em] uppercase text-center">{t.nextProject}</span>
+              <span
+                className="font-mono text-[10px] tracking-[0.4em] uppercase text-center tabular-nums"
+                style={{ minWidth: "12ch" }}
+              >
+                {advanceLoading ? "LOADING..." : "ADVANCE SEQUENCE"}
+              </span>
               <div
-                className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center group-hover:bg-white group-hover:border-white"
-                style={{ transition: `background 500ms ${ease.mechanical}, border-color 500ms ${ease.mechanical}` }}
+                className="w-10 h-10 border border-white/20 flex items-center justify-center group-hover:bg-white group-hover:border-white"
+                style={{
+                  borderRadius: 0,
+                  transition: `background 500ms ${ease.mechanical}, border-color 500ms ${ease.mechanical}`,
+                }}
               >
                 <svg
                   width="14"
@@ -424,6 +491,7 @@ export default function ProjectDetail() {
                   xmlns="http://www.w3.org/2000/svg"
                   className="text-white group-hover:text-black group-hover:translate-y-1"
                   style={{ transition: `transform 500ms ${ease.silk}, color 500ms ${ease.mechanical}` }}
+                  aria-hidden="true"
                 >
                   <path
                     d="M13 1L1 13M1 13H9.4M1 13V4.6"
@@ -474,6 +542,37 @@ export default function ProjectDetail() {
           100% { transform: translateY(12px); opacity: 0; }
         }
         .animate-wheel-scroll { animation: wheel-scroll 1.5s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+
+        /*
+         * CRT SCANLINE — a 1px-on / 2px-off horizontal-line pattern laid
+         * across the live-preview window. It lives on the OUTER (non-
+         * scrolling) mac frame as a ::after pseudo so the pattern stays
+         * locked to the viewport while the screenshot scrolls beneath it
+         * — the artifact a real phosphor mask produces on a CRT. The
+         * pseudo is pointer-events:none so it never intercepts clicks
+         * and adds zero JSX nodes. Mix-blend overlay lets the underlying
+         * image show through while the lines suppress the highlights.
+         */
+        .mac-window-crt::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 20;
+          background-image: repeating-linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.045) 0px,
+            rgba(255, 255, 255, 0.045) 1px,
+            transparent 1px,
+            transparent 3px
+          );
+          mix-blend-mode: overlay;
+          opacity: 0.85;
+          border-radius: inherit;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .mac-window-crt::after { opacity: 0.4; }
+        }
       `,
         }}
       />

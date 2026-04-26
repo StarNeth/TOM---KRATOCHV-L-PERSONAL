@@ -16,16 +16,19 @@ const DICTIONARY = {
   cs: { title: "Architektura" },
 }
 
+// Per Section 6D — exactly ONE "critical" element. Controlled danger.
+// One "circle" element holding the binary oscilloscope. Everything else
+// is a hard rectangle. The vocabulary is short and absolute.
 const skillsData = [
-  { text: "SYSTEM ARCHITECTURE", type: "solid",   desk: { x: 15, y: 20 } },
-  { text: "NEXT.JS 16",          type: "outline", desk: { x: 50, y: 15 } },
-  { text: "REACT 19",            type: "orange",  desk: { x: 80, y: 25 } },
-  { text: "WEBGL",               type: "circle",  desk: { x: 20, y: 50 } },
-  { text: "UI/UX",               type: "outline", desk: { x: 85, y: 55 } },
-  { text: "PERFORMANCE",         type: "solid",   desk: { x: 15, y: 80 } },
-  { text: "3D EXPERIENCES",      type: "outline", desk: { x: 50, y: 85 } },
-  { text: "GSAP",                type: "orange",  desk: { x: 80, y: 85 } },
-]
+  { text: "SYSTEM ARCHITECTURE", type: "solid",    desk: { x: 15, y: 20 } },
+  { text: "NEXT.JS 16",          type: "outline",  desk: { x: 50, y: 15 } },
+  { text: "REACT 19",            type: "outline",  desk: { x: 80, y: 25 } },
+  { text: "WEBGL",               type: "circle",   desk: { x: 20, y: 50 } },
+  { text: "UI/UX",               type: "outline",  desk: { x: 85, y: 55 } },
+  { text: "PERFORMANCE",         type: "solid",    desk: { x: 15, y: 80 } },
+  { text: "3D EXPERIENCES",      type: "outline",  desk: { x: 50, y: 85 } },
+  { text: "GSAP",                type: "critical", desk: { x: 80, y: 85 } },
+] as const
 
 export const Capabilities = () => {
   const { language } = useLanguage()
@@ -268,26 +271,52 @@ export const Capabilities = () => {
         className="relative md:absolute md:inset-0 w-full md:h-full z-20 pointer-events-none max-w-[1600px] mx-auto flex flex-wrap content-center justify-center gap-3 px-4 md:px-0 md:block"
       >
         {skillsData.map((skill, i) => {
+          // Section 6D vocabulary. Hard rectangles. No glow. No border-radius.
+          // Type "solid":    white fill, void text, 1px border at 0.85.
+          // Type "outline":  void fill, 1px --rule border → --rule-active on hover.
+          // Type "critical": one element only — controlled danger.
+          // Type "circle":   the only circle, holds the binary oscilloscope.
           let baseClasses =
-            "flex items-center justify-center transition-shadow duration-500 will-change-transform shadow-2xl "
+            "flex items-center justify-center transition-colors duration-300 will-change-transform "
           let textClasses =
             "font-sans font-black tracking-widest uppercase pointer-events-none select-none "
+          let inlineStyle: React.CSSProperties = {}
 
           if (skill.type === "solid") {
-            baseClasses +=
-              "bg-white text-black px-5 py-3 md:px-10 md:py-6 rounded-full hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]"
+            baseClasses += "px-5 py-3 md:px-10 md:py-6"
+            inlineStyle = {
+              background: "var(--signal)",
+              color: "var(--void)",
+              border: "1px solid rgba(255,255,255,0.85)",
+              borderRadius: 0,
+            }
             textClasses += "text-[10px] md:text-xs"
           } else if (skill.type === "outline") {
-            baseClasses +=
-              "bg-transparent border border-white/20 text-white px-5 py-3 md:px-10 md:py-6 rounded-full backdrop-blur-md hover:border-white hover:bg-white/5"
+            baseClasses += "px-5 py-3 md:px-10 md:py-6"
+            inlineStyle = {
+              background: "var(--void)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--rule)",
+              borderRadius: 0,
+            }
             textClasses += "text-[10px] md:text-xs"
-          } else if (skill.type === "orange") {
-            baseClasses +=
-              "bg-[#ff2a00] text-white px-5 py-3 md:px-10 md:py-6 rounded-2xl hover:bg-white hover:text-[#ff2a00] hover:shadow-[0_0_30px_rgba(255,42,0,0.5)]"
+          } else if (skill.type === "critical") {
+            baseClasses += "px-5 py-3 md:px-10 md:py-6"
+            inlineStyle = {
+              background: "var(--critical)",
+              color: "var(--signal)",
+              border: "1px solid rgba(255,42,0,0.9)",
+              borderRadius: 0,
+            }
             textClasses += "text-[10px] md:text-xs"
           } else if (skill.type === "circle") {
-            baseClasses +=
-              "bg-[#030303]/80 border border-white/10 text-white w-20 h-20 md:w-32 md:h-32 rounded-full backdrop-blur-md hover:border-[#ff2a00]"
+            baseClasses += "w-20 h-20 md:w-32 md:h-32"
+            inlineStyle = {
+              background: "var(--glass)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--rule)",
+              borderRadius: "9999px",
+            }
             textClasses += "text-[9px] md:text-[10px] text-center leading-tight"
           }
 
@@ -308,6 +337,7 @@ export const Capabilities = () => {
                 className={baseClasses}
                 // ── REGRESSION 02 FIX: Mobile transforms removed to stop bleeding ──
                 style={{
+                  ...inlineStyle,
                   ["--cap-stretch" as any]: 1,
                   ["--cap-skew"    as any]: "0deg",
                   transform: isMobile
@@ -316,7 +346,7 @@ export const Capabilities = () => {
                   willChange: isMobile ? undefined : "transform",
                   transition: isMobile
                     ? undefined
-                    : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                    : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), border-color 280ms cubic-bezier(0.22, 1, 0.36, 1)",
                 }}
               >
                 <span
