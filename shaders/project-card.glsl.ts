@@ -61,10 +61,10 @@ uniform float     uIntensity;  // 0..1 from velocityBus — edge shimmer amount
 out vec4 fragColor;
 
 void main() {
-  // The design spec writes the rest of the math in terms of `uDepthFactor`,
+  // The design spec writes the rest of the math in terms of 'uDepthFactor',
   // even though it is in fact a varying produced by the vertex stage. Aliasing
   // here keeps both names present (the build-time check greps for the literal
-  // `uDepthFactor` token) without redeclaring the same identifier twice.
+  // 'uDepthFactor' token) without redeclaring the same identifier twice.
   float uDepthFactor = vDepthFactor;
 
   // 1. base sample ────────────────────────────────────────────────────────
