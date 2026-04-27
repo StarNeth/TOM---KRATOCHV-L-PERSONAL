@@ -31,3 +31,8 @@ export function useMobile() {
 
   return isMobile;
 }
+
+// shadcn/ui's generated components (e.g. components/ui/sidebar.tsx) import
+// this hook as `useIsMobile`. Re-exporting under the canonical shadcn name
+// keeps that boilerplate working without rewriting every consumer.
+export { useMobile as useIsMobile };

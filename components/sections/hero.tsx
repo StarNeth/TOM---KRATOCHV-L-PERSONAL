@@ -15,11 +15,14 @@ const DICTIONARY = {
   cs: { dive: "Vstoupit do systému", locale: "CZ / EN" },
 }
 
+// Module-level ref so scene.tsx (the WebGL canvas) can read the hero
+// section's bounding rect / DOM node directly without prop drilling.
+// The text headline is now owned by the R3F scene; this ref gives the
+// scene a stable handle on the structural viewport that frames it.
+export const heroSectionRef: { current: HTMLElement | null } = { current: null }
+
 export const Hero = () => {
-  const containerRef = useRef<HTMLElement>(null)
-  const nameRef = useRef<HTMLHeadingElement>(null)
-  const firstRowRef = useRef<HTMLSpanElement>(null)
-  const secondRowRef = useRef<HTMLSpanElement>(null)
+  const containerRef = useRef<HTMLElement | null>(null)
   const tickerRef = useRef<HTMLSpanElement>(null)
   const { language } = useLanguage()
   const content = DICTIONARY[language as keyof typeof DICTIONARY]
@@ -45,6 +48,11 @@ export const Hero = () => {
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent("webgl-transition", { detail: { value: 0, color: -1 } })
+    )
+    // Signal to scene.tsx that the WebGL layer should now own the headline
+    // text rendering. The DOM <h1> has been removed in favor of an R3F mesh.
+    window.dispatchEvent(
+      new CustomEvent("hero-text-webgl", { detail: true })
     )
   }, [])
 
@@ -78,18 +86,23 @@ export const Hero = () => {
     return () => io.disconnect()
   }, [])
 
-  // Velocity-driven skew + tracking — rAF, zero re-renders, gated on visibility.
+  // Velocity-driven CSS custom properties — rAF, zero re-renders, gated on
+  // visibility. The --skew / --track vars are now written to the section
+  // element (containerRef) so they remain available as inheritable CSS
+  // custom properties for any consumer (including scene.tsx via
+  // getComputedStyle, should it want a DOM-driven fallback). The velocity
+  // bus itself remains the canonical source of truth for the WebGL text.
   useEffect(() => {
     if (!animState.ready || !isVisible) return
     let raf = 0
     const tick = () => {
       const { normalized, intensity } = velocityBus.get()
-      const h1 = nameRef.current
-      if (h1) {
+      const section = containerRef.current
+      if (section) {
         const skew = normalized * -4
         const tracking = -0.04 - intensity * 0.02
-        h1.style.setProperty("--skew", `${skew}deg`)
-        h1.style.setProperty("--track", `${tracking}em`)
+        section.style.setProperty("--skew", `${skew}deg`)
+        section.style.setProperty("--track", `${tracking}em`)
       }
       if (tickerRef.current) {
         const drift = Math.round(normalized * 40)
@@ -108,57 +121,19 @@ export const Hero = () => {
         !!sessionStorage.getItem("preloader_played")
 
       if (alreadyPlayed || animState.isBot) {
-        gsap.set([firstRowRef.current, secondRowRef.current], {
-          yPercent: 0,
-          opacity: 1,
-          filter: "blur(0px)",
-          clearProps: "willChange",
-        })
         gsap.set(".hero-ui", { opacity: 1, y: 0 })
       } else if (animState.ready) {
-        gsap.set([firstRowRef.current, secondRowRef.current], {
-          yPercent: 110,
-          opacity: 0,
-          filter: "blur(14px)",
-        })
         gsap.set(".hero-ui", { opacity: 0, y: 12 })
 
-        const tl = gsap.timeline()
-        tl.to(firstRowRef.current, {
-          yPercent: 0,
+        gsap.to(".hero-ui", {
           opacity: 1,
-          filter: "blur(0px)",
-          duration: 1.4,
-          ease: ease.silk,
+          y: 0,
+          duration: 0.9,
+          ease: ease.decay,
+          stagger: 0.12,
+          delay: 0.25,
         })
-          .to(
-            secondRowRef.current,
-            {
-              yPercent: 0,
-              opacity: 1,
-              filter: "blur(0px)",
-              duration: 1.4,
-              ease: ease.silk,
-            },
-            "-=1.15"
-          )
-          .to(
-            ".hero-ui",
-            {
-              opacity: 1,
-              y: 0,
-              duration: 0.9,
-              ease: ease.decay,
-              stagger: 0.12,
-            },
-            "-=0.7"
-          )
       } else {
-        gsap.set([firstRowRef.current, secondRowRef.current], {
-          yPercent: 110,
-          opacity: 0,
-          filter: "blur(14px)",
-        })
         gsap.set(".hero-ui", { opacity: 0, y: 12 })
       }
 
@@ -180,7 +155,10 @@ export const Hero = () => {
 
   return (
     <section
-      ref={containerRef}
+      ref={(el) => {
+        containerRef.current = el
+        heroSectionRef.current = el
+      }}
       className="relative h-[100svh] w-full flex flex-col justify-center items-center z-10 perspective-[1000px] overflow-hidden"
     >
       <div
@@ -206,50 +184,6 @@ export const Hero = () => {
       </div>
 
       <div className="relative z-[3] flex flex-col items-center w-full max-w-[100vw] px-4 sm:px-6">
-        <h1
-          ref={nameRef}
-          style={{
-            ["--skew" as any]: "0deg",
-            ["--track" as any]: "-0.04em",
-            transform: "skewY(var(--skew))",
-            letterSpacing: "var(--track)",
-            fontFeatureSettings: '"ss01", "ss02", "cv01", "ss03"',
-            willChange: "transform, letter-spacing",
-            transition: "transform 120ms linear, letter-spacing 200ms linear",
-            filter:
-              "drop-shadow(0 2px 18px rgba(0,0,0,0.65)) drop-shadow(0 0 42px rgba(0,0,0,0.40)) drop-shadow(0 0 28px rgba(255,255,255,0.06))",
-            color: "#ffffff",
-          }}
-          className="relative font-sans font-black leading-[0.82] uppercase text-center w-full flex flex-col items-center"
-        >
-          <span className="block overflow-hidden w-full">
-            <span
-              ref={firstRowRef}
-              className="block whitespace-nowrap"
-              style={{
-                fontSize: "clamp(3.2rem, 15vw, 22rem)",
-                marginLeft: "-0.04em",
-              }}
-            >
-              TOMÁŠ
-            </span>
-          </span>
-          <span className="block overflow-hidden w-full -mt-[0.06em]">
-            <span
-              ref={secondRowRef}
-              className="block"
-              style={{
-                fontSize: "clamp(2.2rem, 10.5vw, 15rem)",
-                color: "rgba(255,255,255,0.94)",
-                marginRight: "-0.04em",
-                whiteSpace: "nowrap",
-              }}
-            >
-              KRATOCHVÍL
-            </span>
-          </span>
-        </h1>
-
         <div
           className="hero-ui mt-10 flex items-center gap-4 font-mono text-[10px] tracking-[0.45em] uppercase text-white/60"
           style={{ textShadow: "0 0 16px rgba(0,0,0,0.75)" }}

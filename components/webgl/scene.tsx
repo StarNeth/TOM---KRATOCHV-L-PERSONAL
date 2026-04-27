@@ -104,6 +104,9 @@ import { velocityBus } from "@/lib/velocity-bus"
 // Those libraries reference `window` at module init and blow up the
 // server render. See lib/cursor-bus.ts for the full rationale.
 import { cursorBus } from "@/lib/cursor-bus"
+import TextBaker from "./text-baker"
+import FluidSimulation from "./fluid-simulation"
+import FluidDisplayMesh from "./fluid-display-mesh"
 
 type LiquidProps = { isMobile: boolean; onFirstFrame: () => void }
 
@@ -326,7 +329,7 @@ const LiquidObsidianMaterial = ({ isMobile, onFirstFrame }: LiquidProps) => {
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ═══════���════════════════════════════════════════════════���══════════
     // PBR — Cook-Torrance GGX BRDF
     // Cheap arithmetic only — no noise samples.
     // ═══════════════════════════════════════════════════════════════════
@@ -669,6 +672,20 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
   const { canUseWebGL, isReady } = useWebGLSupport()
   const [hasWebGLError, setHasWebGLError] = useState(false)
 
+  // ── FLUID + TEXT HANDOFF ───────────────────────────────────────────
+  // dyeTexRef receives the live dye field from FluidSimulation each
+  // frame and is read by FluidDisplayMesh in useFrame — a ref keeps
+  // that fast-path allocation-free and avoids per-frame re-renders.
+  //
+  // initTex is *state*, not a ref, on purpose: FluidSimulation closes
+  // over `initialTexture` from props inside its useFrame. If we mutated
+  // a ref, the simulation would never observe the late-arriving baked
+  // texture. Setting state once (when TextBaker fires onBaked) re-renders
+  // WebGLScene exactly once and the simulation's seed branch sees the
+  // new value, latches `hasBakedRef`, and never runs again.
+  const dyeTexRef = useRef<THREE.Texture | null>(null)
+  const [initTex, setInitTex] = useState<THREE.Texture | null>(null)
+
   const shouldUseFallback =
     !forceRender && (hasWebGLError || (isReady && !canUseWebGL))
 
@@ -773,6 +790,33 @@ export const WebGLScene = ({ forceRender = false }: WebGLSceneProps) => {
             <Vignette eskil={false} offset={0.18} darkness={0.88} />
           </EffectComposer>
         )}
+
+          {/* ── TEXT → FLUID → DISPLAY ─────────────────────────────────
+              TextBaker renders "TOMÁŠ / KRATOCHVÍL" once into an
+              off-screen render target and hands the texture to
+              initTexRef via onBaked. FluidSimulation seeds its dye
+              field with that texture on the first frame after the
+              ref populates, then advects/diffuses it forever. The
+              dye field is exposed each frame through dyeTexRef and
+              composited into the visible image by FluidDisplayMesh
+              with additive blending so the headline reads as light
+              welling up through the obsidian surface. */}
+          <TextBaker
+            text={["TOMÁŠ", "KRATOCHVÍL"]}
+            onBaked={(tex) => {
+              setInitTex(tex)
+            }}
+          />
+          <FluidSimulation
+            resolution={512}
+            pressureIterations={20}
+            dissipation={0.988}
+            initialTexture={initTex}
+            onDyeReady={(tex) => {
+              dyeTexRef.current = tex
+            }}
+          />
+          <FluidDisplayMesh dyeTexture={dyeTexRef} />
         </Canvas>
       </div>
     </WebGLErrorBoundary>
