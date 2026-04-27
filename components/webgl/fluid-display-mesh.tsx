@@ -39,9 +39,14 @@ export interface FluidDisplayMeshProps {
   dyeTexture: MutableRefObject<THREE.Texture | null>
 }
 
+// three.js types `ShaderMaterial.uniforms` as a string-indexed record of
+// IUniform, so our concrete shape needs an index signature to be
+// assignable. The named fields stay typed for the in-component fast-path
+// reads/writes; the index signature is purely a structural escape hatch.
 interface DisplayUniforms {
   uDye: { value: THREE.Texture | null }
   uHasDye: { value: number }
+  [uniform: string]: THREE.IUniform
 }
 
 const VERTEX_SHADER: string = /* glsl */ `
