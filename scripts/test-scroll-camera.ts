@@ -17,7 +17,7 @@ import {
   scrollCameraBus,
   updateScrollCamera,
   stepScrollCamera,
-} from "../lib/scroll-camera-bus"
+} from "../lib/scroll-camera-bus.ts"
 
 let failures = 0
 const approx = (a: number, b: number, eps = 1e-6): boolean =>
