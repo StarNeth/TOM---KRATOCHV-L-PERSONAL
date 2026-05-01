@@ -406,14 +406,14 @@ export const Projects = () => {
 
           // Slow high-tension zoom — the dread build.
           gsap.to(wrap, { opacity: 1, duration: 0.4, ease: "power2.out" })
-          gsap.to(wrap, { scale: 1.12, duration: 4, ease: "power1.out" })
+          gsap.to(wrap, { scale: 1.06, duration: 3, ease: "power1.out" })
 
           if (cR && cC) {
             // Kill any prior timeline for this index before registering a new one.
             timelines.get(i)?.kill()
 
             const tl = gsap.timeline({ repeat: -1, repeatDelay: 2.2 })
-            tl.set([cR, cC], { opacity: 0.9 })
+            tl.set([cR, cC], { opacity: 0.4 })
               .to(
                 cR,
                 {
@@ -598,7 +598,7 @@ export const Projects = () => {
                 draggable={false}
                 aria-label={`View case study for ${p.title}`}
                 data-cursor="hover"
-                className="relative block w-full h-full rounded-xl md:rounded-[2rem] overflow-hidden bg-[#050505] pointer-events-auto cursor-pointer"
+                className="relative block w-full h-full rounded-lg overflow-hidden bg-[#050505] pointer-events-auto cursor-pointer"
                 style={{
                   // Signal-strength border + glow — driven from the rAF tick.
                   ["--border-opacity" as any]: 0.1,
@@ -701,7 +701,7 @@ export const Projects = () => {
                   aria-hidden
                 >
                   <div className="text-white/40 mb-1.5">PROJ · RENDER · MATRIX</div>
-                  <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+                  <div className="hidden md:grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
                     <span className="text-white/40">ROT_Y</span>
                     <span
                       ref={(el) => {

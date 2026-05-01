@@ -35,7 +35,7 @@ export const cursorBus = {
   get: (): CursorState => state,
 
   /** Pixel-space write from cursor.tsx — normalizes internally. */
-  writePixel(px: number, py: number) {
+  writePixel(px: number, py: number, normSpd: number) {
     if (typeof window === "undefined") return
     const nx = (px / window.innerWidth) * 2 - 1
     const ny = -(py / window.innerHeight) * 2 + 1

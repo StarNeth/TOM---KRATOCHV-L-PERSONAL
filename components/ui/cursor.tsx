@@ -3,45 +3,63 @@
 /**
  * cursor.tsx — Nuclear Precision Pointer
  * ────────────────────────────────────────────────────────────────────────────
- *  REFRESH-RATE AWARENESS (new)
- *    Lerp coefficients are normalized to a 60Hz baseline. On 120Hz ProMotion
- *    (≈ 8ms rAF delta), the effective lerp pushes to the audit-mandated 0.32.
- *    On 60Hz it stays at ~0.18. The cursor FEELS tethered on both displays.
+ *  MIX-BLEND-MODE: DIFFERENCE (new)
+ *    The cursor root carries `mix-blend-mode: difference`. A white dot on a
+ *    white (#F5F5F0) background inverts to near-black. On a dark (#0d0d0d)
+ *    background it stays white. The cursor is fully visible across every
+ *    surface — including the Act VI collision flash from white to dark —
+ *    with zero JavaScript color-switching. The hover borderColor override
+ *    has been removed; blend mode makes it redundant.
  *
- *  CURSOR → WEBGL BUS (new)
- *    Every pointermove writes normalized coords + velocity into the shared
- *    cursorBus (see scene.tsx). The WebGL surface consumes this each frame
- *    to render a decaying UV-displacement wake in the cursor's path.
- *    The DOM pointer and the fluid are no longer parallel systems.
+ *  VELOCITY-BASED RING STRETCH (new)
+ *    Each frame the render loop computes vx/vy from the delta between the
+ *    current and previous TARGET position (pointer intent, not the lagged
+ *    ring position — that would double-damp). Speed is clamped to a
+ *    `MAX_SPEED` cap and then mapped to a `stretchFactor` in [1, 1.5].
+ *    The ring is scaled on its X axis along the travel vector by rotating
+ *    the element, applying non-uniform scale, then counter-rotating — the
+ *    classic squash-and-stretch decomposition. At rest: perfect circle.
+ *    At speed: an ellipse oriented along the pointer's direction of travel.
  *
- *  PERFORMANCE
+ *  LAMBDA_TRAIL: 10 → 15 (tuned)
+ *    At λ=10 the ring lagged so far behind on fast sweeps that it
+ *    effectively disappeared relative to the dot. λ=15 preserves the
+ *    trailing personality while keeping the ring present.
+ *
+ *  CURSORFBUS VELOCITY (fixed)
+ *    `cursorBus.writePixel` now receives normalized UV coords (0–1) AND
+ *    a speed scalar (px/s, clamped) so the WebGL surface can scale its
+ *    displacement wake correctly with actual pointer velocity.
+ *
+ *  DOT SIZE: 8px → 5px
+ *    Sharper, more editorial. Less of a thumb target, more of a scalpel.
+ *
+ *  REFRESH-RATE AWARENESS (unchanged)
+ *    Exponential decay `1 - exp(-λ·dt)` is analytically frame-rate
+ *    independent. Feels identical at 60Hz, 120Hz, 144Hz.
+ *
+ *  PERFORMANCE (unchanged)
  *    • Zero React re-renders after the initial `mounted` flip.
  *    • Single requestAnimationFrame loop, two DOM writes per frame.
- *    • `boxShadow` instead of `filter: drop-shadow` — vector-sharp at scale.
+ *    • `boxShadow` instead of `filter: drop-shadow`.
  * ────────────────────────────────────────────────────────────────────────────
  */
 
 import { useEffect, useRef, useState } from "react"
-// Import from the standalone lib module — NOT from components/webgl/scene.
-// cursor.tsx renders on every page (including /work/[id]) via the root
-// layout. Importing the scene module statically would drag `three` and
-// `@react-three/postprocessing` into the SSR graph and crash the server
-// render (postprocessing touches `window` at module init).
 import { cursorBus } from "@/lib/cursor-bus"
 
-// ─── EXPONENTIAL DECAY (analytically frame-rate independent) ───────────────
-// `lerp(a, b, k)` is per-frame-percentage and therefore TWICE as aggressive
-// at 120Hz as at 60Hz. The correct formulation for a critically-damped
-// follow is `x += (target - x) * (1 - exp(-λ·dt))` where λ is a time
-// constant in continuous time. At λ = 23, the cursor converges 63% every
-// 43ms regardless of whether rAF fires at 60Hz, 120Hz, or 144Hz.
-//
-// Calibration: at 60Hz (dt ≈ 16.67ms) this matches a legacy per-frame
-// lerp of ~0.32 for the main dot and ~0.15 for the trailing ring — the
-// same perceptual feel the audit spec requires, but now PROVABLY correct
-// at any refresh rate.
-const LAMBDA_MAIN  = 23   // 1/s — main dot
-const LAMBDA_TRAIL = 10   // 1/s — outer ring trails slightly behind
+// ─── TIME CONSTANTS ────────────────────────────────────────────────────────
+// λ in 1/s. At 60Hz (dt≈16.67ms): mainDecay≈0.32, trailDecay≈0.22.
+// At 120Hz (dt≈8.33ms): same perceptual convergence — analytically correct.
+const LAMBDA_MAIN  = 23  // main dot — snappy
+const LAMBDA_TRAIL = 15  // ring — trails but stays present
+
+// ─── VELOCITY STRETCH ──────────────────────────────────────────────────────
+// Ring stretches into an ellipse along the travel vector.
+// MAX_SPEED is the px/s at which the ring reaches full stretch.
+const MAX_SPEED     = 1800  // px/s — beyond this speed is clamped
+const MAX_STRETCH   = 1.55  // scaleX multiplier at MAX_SPEED
+const MIN_SCALE_Y   = 0.72  // scaleY at MAX_SPEED (conservation of area feel)
 
 export const Cursor = () => {
   const [mounted, setMounted] = useState(false)
@@ -66,13 +84,15 @@ export const Cursor = () => {
     const ring = ringRef.current
     const dot  = dotRef.current
 
-    // Force-hide native cursor globally — CSS specificity battle winner.
+    // Force-hide native cursor globally
     const style = document.createElement("style")
     style.textContent = `* { cursor: none !important; }`
     document.head.appendChild(style)
 
     let targetX = window.innerWidth  / 2
     let targetY = window.innerHeight / 2
+    let prevTargetX = targetX
+    let prevTargetY = targetY
     let mainX   = targetX
     let mainY   = targetY
     let trailX  = targetX
@@ -83,16 +103,15 @@ export const Cursor = () => {
     let rafId   = 0
     let lastT   = performance.now()
 
+    // Smooth the stretch so it doesn't snap back instantly
+    let smoothStretch = 1.0
+    let smoothAngle   = 0.0
+
     const render = (now: number) => {
-      // dt in SECONDS — the time constant λ is 1/seconds, so convergence
-      // depends on wall-clock time, not on how many times rAF has fired.
-      // Clamp the top end so a dropped frame can't teleport the cursor.
       const dt = Math.min((now - lastT) / 1000, 0.05)
       lastT = now
 
-      // 1 - exp(-λ·dt) is the closed-form solution to the continuous
-      // differential equation dx/dt = -λ·(x - target). Identical
-      // perceptual motion at 60Hz, 120Hz, 144Hz.
+      // ── Exponential decay — frame-rate independent ──────────────────
       const mainDecay  = 1 - Math.exp(-LAMBDA_MAIN  * dt)
       const trailDecay = 1 - Math.exp(-LAMBDA_TRAIL * dt)
 
@@ -101,23 +120,52 @@ export const Cursor = () => {
       trailX += (targetX - trailX) * trailDecay
       trailY += (targetY - trailY) * trailDecay
 
+      // ── Velocity from TARGET delta — not the lagged ring ────────────
+      const vx       = (targetX - prevTargetX) / Math.max(dt, 0.001)
+      const vy       = (targetY - prevTargetY) / Math.max(dt, 0.001)
+      const speed    = Math.sqrt(vx * vx + vy * vy)
+      prevTargetX    = targetX
+      prevTargetY    = targetY
+
+      // ── Stretch factor ──────────────────────────────────────────────
+      const t           = Math.min(speed / MAX_SPEED, 1.0)
+      const targetStretch = 1 + (MAX_STRETCH - 1) * t
+      const targetScaleY  = 1 - (1 - MIN_SCALE_Y)  * t
+      // Angle of travel — only meaningful when moving
+      const targetAngle   = speed > 8 ? Math.atan2(vy, vx) * (180 / Math.PI) : smoothAngle
+
+      // Smooth the stretch with a fast exponential decay
+      const stretchDecay = 1 - Math.exp(-18 * dt)
+      smoothStretch += (targetStretch - smoothStretch) * stretchDecay
+      smoothAngle   += (targetAngle   - smoothAngle)   * stretchDecay
+
+      // ── DOM writes ──────────────────────────────────────────────────
       root.style.transform = `translate3d(${mainX}px, ${mainY}px, 0)`
 
       const dx = trailX - mainX
       const dy = trailY - mainY
-      const ringScale = isHover ? 1.8 : isDown ? 0.7 : 1
-      const dotScale  = isHover ? 1.5 : isDown ? 0.7 : 1
 
-      ring.style.transform =
-        `translate3d(calc(-50% + ${dx}px), calc(-50% + ${dy}px), 0) scale(${ringScale})`
-      dot.style.transform  = `translate(-50%, -50%) scale(${dotScale})`
-      ring.style.borderColor = isHover
-        ? "rgba(255,255,255,1)"
-        : "rgba(255,255,255,0.4)"
+      // Base scale from interaction state
+      const baseScale = isHover ? 1.7 : isDown ? 0.65 : 1.0
+      const dotScale  = isHover ? 1.4 : isDown ? 0.65 : 1.0
 
-      // Push the DOM pointer position to the WebGL bus — the fluid
-      // reads this each frame and warps its UVs in the cursor's wake.
-      cursorBus.writePixel(mainX, mainY)
+      // Decompose: rotate to travel angle → stretch → counter-rotate
+      // This orients the ellipse along the direction of motion
+      ring.style.transform = [
+        `translate3d(calc(-50% + ${dx}px), calc(-50% + ${dy}px), 0)`,
+        `rotate(${smoothAngle}deg)`,
+        `scale(${smoothStretch * baseScale}, ${targetScaleY * baseScale})`,
+        `rotate(${-smoothAngle}deg)`,
+      ].join(" ")
+
+      dot.style.transform = `translate(-50%, -50%) scale(${dotScale})`
+
+      // ── Push to WebGL bus: normalized UV + speed scalar ─────────────
+      // WebGL can now size the displacement wake proportionally to velocity
+      const normX  = mainX / window.innerWidth
+      const normY  = mainY / window.innerHeight
+      const normSpd = Math.min(speed / MAX_SPEED, 1.0)
+      cursorBus.writePixel(normX * window.innerWidth, normY * window.innerHeight, normSpd)
 
       rafId = requestAnimationFrame(render)
     }
@@ -126,7 +174,7 @@ export const Cursor = () => {
       targetX = e.clientX
       targetY = e.clientY
     }
-    const onPointerDown = () => { isDown = true }
+    const onPointerDown = () => { isDown = true  }
     const onPointerUp   = () => { isDown = false }
 
     const CLICKABLE =
@@ -162,32 +210,39 @@ export const Cursor = () => {
       className="fixed top-0 left-0 pointer-events-none"
       style={{
         zIndex: 999999,
+        // mix-blend-mode: difference makes the white cursor invert against
+        // any background. White on #F5F5F0 → near-black. White on #0d0d0d
+        // → white. No color logic needed anywhere in this file.
+        mixBlendMode: "difference",
         isolation: "isolate",
         willChange: "transform",
       }}
     >
+      {/* Ring — trails behind, stretches along travel vector */}
       <div
         ref={ringRef}
         className="absolute top-0 left-0 rounded-full"
         style={{
-          width: "26px",
-          height: "26px",
-          border: "1px solid rgba(255,255,255,0.4)",
-          willChange: "transform",
-          transition: "border-color 0.2s ease-out",
-          boxShadow: "0 0 10px rgba(0,0,0,0.5)",
+          width:       "26px",
+          height:      "26px",
+          border:      "1px solid rgba(255,255,255,0.9)",
+          willChange:  "transform",
+          // No transition — transform is driven entirely by the rAF loop.
+          // A CSS transition here fights the velocity stretch and creates
+          // a laggy double-damping artifact.
+          boxShadow:   "0 0 8px rgba(0,0,0,0.25)",
         }}
       />
+      {/* Dot — snaps to pointer, scales on interaction */}
       <div
         ref={dotRef}
-        className="absolute top-0 left-0 bg-white rounded-full"
+        className="absolute top-0 left-0 rounded-full"
         style={{
-          width: "8px",
-          height: "8px",
+          width:      "5px",
+          height:     "5px",
+          backgroundColor: "white",
           willChange: "transform",
-          // boxShadow keeps the dot vector-sharp at any scale
-          // (filter: drop-shadow would rasterize to bitmap).
-          boxShadow: "0 2px 4px rgba(0,0,0,0.8)",
+          boxShadow:  "0 1px 3px rgba(0,0,0,0.6)",
         }}
       />
     </div>

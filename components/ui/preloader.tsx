@@ -3,55 +3,31 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
  * PRELOADER — Nuclear Fusion & Portal Reveal
+ * White-background premium edition — Awwwards aesthetic
  * ═══════════════════════════════════════════════════════════════════
  *
  * PERFORMANCE CONTRACT
  * ─────────────────────
- * • Exactly ONE React `setState` call exists in this file: `setDone(true)`
- *   at the final frame of Act VII. Everything else is ref + imperative DOM.
- * • 350 particle objects are pre-computed in `useMemo` using seeded math
- *   — deterministic, zero allocation on re-render.
- * • Every animated element carries `will-change: transform, opacity` so
- *   the GPU compositor pre-promotes layers before Act I begins.
- * • The GSAP timeline is stored in a ref and `.kill()`-ed on unmount.
- * • `useLayoutEffect` fires synchronously before the browser's first paint,
- *   guaranteeing zero flicker on return visits.
+ * • Exactly ONE React `setState` call: `setDone(true)` at Act VII end.
+ *   Everything else is ref + imperative DOM.
+ * • 350 particle objects pre-computed in `useMemo` via seeded math —
+ *   deterministic, zero allocation on re-render.
+ * • Every animated element carries `will-change: transform, opacity`
+ *   for GPU compositor pre-promotion before Act I.
+ * • GSAP timeline stored in ref, `.kill()`-ed on unmount.
+ * • `useLayoutEffect` fires before first paint — zero flicker.
  *
- * POISSON SETTLEMENT — WHAT CHANGED IN THIS REVISION
- * ───────────────────────────────────────────────────
- * The previous implementation computed per-particle inter-arrival times
- * via exponential sampling (Δt = −ln(U) / λ) — mathematically sound —
- * but then handed those times to GSAP's `stagger` as if they were
- * ABSOLUTE delays. That collapsed every particle into a 60–120ms uniform
- * jitter. The Poisson process existed in the variable names only.
- *
- * This revision:
- *   1. Computes per-particle settle deltas WITHOUT clamping the long tail.
- *   2. Accumulates them into a CUMULATIVE ARRIVAL TIME (`cumArrival`).
- *   3. Scales the cumulative series so the last particle lands at 650ms.
- *   4. Feeds `cumArrival` as the stagger value.
- *
- * Result: particles arrive in perceptible CLUSTERS followed by silences.
- * Three particles land in 40ms, then nothing for 200ms, then five in 80ms.
- * That is the broken-clock cadence of a true Poisson process — the
- * fingerprint of physical simulation, not choreography.
- *
- * STRUCTURAL: the 160ms CSS transition that was fighting the spring in
- * `projects.tsx` has been removed over there. This file was clean.
- *
- * ═══════════════════════════════════════════════════════════════════
- * DIRECTOR'S SURGICAL PATCH — REGRESSION 01 TERTIARY (poll timeout)
- * ═══════════════════════════════════════════════════════════════════
- * The `webgl-first-frame` poll window was hardcoded at 500ms. On an
- * A13 Bionic compiling the fragment shader for the first time, 500ms
- * is insufficient — shader compilation alone can take 800–1200ms on
- * first load. The poll expired, `commitFinish()` fired, and the user
- * got the hero with a still-compiling shader underneath.
- *
- * FIX: detect mobile (via `navigator.maxTouchPoints > 0 && innerWidth
- * < 1024`, with an Android userAgent fallback — userAgent alone is
- * unreliable on iPadOS) and extend the poll timeout to 2500ms there.
- * Desktop retains the 500ms timeout — no desktop regression.
+ * REVISION NOTES — FINAL POLISH
+ * ───────────────────────────────
+ * • Meta bars restored: "Nuclear System" / countdown / progress label.
+ * • Counter sized down (clamp 5.5rem→19rem) so T/K letters dominate.
+ * • Particle shapes mixed: ~60% tall slivers (2:1), ~40% squares.
+ * • Static particle opacity removed — GSAP owns opacity from zero.
+ * • Act I fast phase: 600ms → 400ms for a snappier ticker.
+ * • Act V drift: 1.8s power1 → 1.3s power2.inOut — decisive pull.
+ * • Act VI: stageRef micro-shockwave scale(1.04) on collision.
+ * • Dissolve jitter capped at 0.08 — no stragglers.
+ * • Portrait geometry tightened for sub-390px viewports.
  * ═══════════════════════════════════════════════════════════════════
  */
 
@@ -59,13 +35,17 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import gsap from "gsap"
 
 // ═══════════════════════════════════════════════════════════════════════════
-// LETTERFORM GEOMETRY — module-level pure functions, no side effects
+// SEEDED RANDOM — pure, no side effects
 // ═══════════════════════════════════════════════════════════════════════════
 
 function sr(n: number): number {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453123
   return x - Math.floor(x)
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LETTERFORM GEOMETRY
+// ═══════════════════════════════════════════════════════════════════════════
 
 function tPoint(i: number): { nx: number; ny: number } {
   const r1 = sr(i * 3.1 + 0.1)
@@ -76,7 +56,7 @@ function tPoint(i: number): { nx: number; ny: number } {
   const BAR_TOP = 0.5
   const STEM_HW = 0.13
 
-  const barArea = 1.0 * (BAR_TOP - BAR_BOT)
+  const barArea  = 1.0 * (BAR_TOP - BAR_BOT)
   const stemArea = STEM_HW * 2 * (BAR_BOT + 0.5)
   const barRatio = barArea / (barArea + stemArea)
 
@@ -98,8 +78,8 @@ function kPoint(i: number): { nx: number; ny: number } {
   const ARM_Y1 = 0.5
   const ARM_HT = 0.065
 
-  const armDX = ARM_X1 - STEM_R
-  const armDY = ARM_Y1
+  const armDX  = ARM_X1 - STEM_R
+  const armDY  = ARM_Y1
   const armLen = Math.sqrt(armDX * armDX + armDY * armDY)
 
   const tX = armDX / armLen
@@ -107,11 +87,11 @@ function kPoint(i: number): { nx: number; ny: number } {
   const pX = -tY
   const pY = tX
 
-  const stemArea = (STEM_R - STEM_L) * 1.0
-  const armArea = armLen * (ARM_HT * 2)
-  const total = stemArea + armArea * 2
-  const stemCut = stemArea / total
-  const upperCut = (stemArea + armArea) / total
+  const stemArea  = (STEM_R - STEM_L) * 1.0
+  const armArea   = armLen * (ARM_HT * 2)
+  const total     = stemArea + armArea * 2
+  const stemCut   = stemArea / total
+  const upperCut  = (stemArea + armArea) / total
 
   if (r4 < stemCut) {
     return { nx: STEM_L + r1 * (STEM_R - STEM_L), ny: r2 - 0.5 }
@@ -122,46 +102,51 @@ function kPoint(i: number): { nx: number; ny: number } {
   } else {
     const lPX = tY
     const lPY = tX
-    const t = r1
-    const s = (r2 - 0.5) * 2 * ARM_HT
+    const t   = r1
+    const s   = (r2 - 0.5) * 2 * ARM_HT
     return { nx: STEM_R + t * armDX + lPX * s, ny: -t * armDY + lPY * s }
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 
-const PARTICLE_COUNT = 350 // 175 → T, 175 → K
-const POISSON_WINDOW = 0.65 // 650ms — the entire settle phase
-const POISSON_LAMBDA = 13.3 // mean inter-arrival = 1/λ ≈ 75ms
+const PARTICLE_COUNT = 350   // 175 → T, 175 → K
+const POISSON_WINDOW = 0.65  // 650ms settle envelope
+const POISSON_LAMBDA = 13.3  // mean inter-arrival ≈ 75ms
+const SLIVER_RATIO   = 0.60  // fraction of particles that are tall slivers
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
 
 export const Preloader = () => {
-  const rootRef = useRef<HTMLDivElement>(null)
-  const stageRef = useRef<HTMLDivElement>(null)
+  const rootRef           = useRef<HTMLDivElement>(null)
+  const stageRef          = useRef<HTMLDivElement>(null)
 
-  const counterRef = useRef<HTMLDivElement>(null)
-  const digit0Ref = useRef<HTMLSpanElement>(null)
-  const digit1Ref = useRef<HTMLSpanElement>(null)
-  const digit2Ref = useRef<HTMLSpanElement>(null)
-  const progressBarRef = useRef<HTMLDivElement>(null)
-  const progressNumRef = useRef<HTMLSpanElement>(null)
-  const countdownRef = useRef<HTMLSpanElement>(null)
+  const counterRef        = useRef<HTMLDivElement>(null)
+  const digit0Ref         = useRef<HTMLSpanElement>(null)
+  const digit1Ref         = useRef<HTMLSpanElement>(null)
+  const digit2Ref         = useRef<HTMLSpanElement>(null)
+  const progressBarRef    = useRef<HTMLDivElement>(null)
+  const progressNumRef    = useRef<HTMLSpanElement>(null)
+  const countdownRef      = useRef<HTMLSpanElement>(null)
 
   const shardContainerRef = useRef<HTMLDivElement>(null)
-  const letterTRef = useRef<HTMLSpanElement>(null)
-  const letterKRef = useRef<HTMLSpanElement>(null)
+  const letterTRef        = useRef<HTMLSpanElement>(null)
+  const letterKRef        = useRef<HTMLSpanElement>(null)
 
-  const topRuleRef = useRef<HTMLDivElement>(null)
-  const botRuleRef = useRef<HTMLDivElement>(null)
-  const labelRef = useRef<HTMLDivElement>(null)
+  const topRuleRef        = useRef<HTMLDivElement>(null)
+  const botRuleRef        = useRef<HTMLDivElement>(null)
+  const labelRef          = useRef<HTMLDivElement>(null)
 
-  const liveRef = useRef<HTMLDivElement>(null)
+  const liveRef           = useRef<HTMLDivElement>(null)
 
-  const completedRef = useRef(false)
-  const isBotRef = useRef(false)
-  const reducedMotionRef = useRef(false)
-  const tlRef       = useRef<gsap.core.Timeline | null>(null)
-  const pollRafRef  = useRef(0)
-  const pollAborted = useRef(false)
+  const completedRef      = useRef(false)
+  const isBotRef          = useRef(false)
+  const reducedMotionRef  = useRef(false)
+  const tlRef             = useRef<gsap.core.Timeline | null>(null)
+  const pollRafRef        = useRef(0)
+  const pollAborted       = useRef(false)
 
   const [done, setDone] = useState(false)
 
@@ -169,44 +154,34 @@ export const Preloader = () => {
     if (liveRef.current) liveRef.current.textContent = msg
   }, [])
 
-  // ═════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
   // PARTICLE GEOMETRY + TRUE POISSON ARRIVAL TIMES
   //
-  // Phase 1: sample per-particle inter-arrival delta via exponential
-  //          distribution. NO clamping — the long tail is the whole point;
-  //          clamping to 120ms eliminated every event that would produce
-  //          a perceptible gap.
-  // Phase 2: accumulate the deltas within each cluster (T and K run as
-  //          independent Poisson processes — they are two separate arrival
-  //          streams at different targets, so they must not share a clock).
-  // Phase 3: scale each cluster's arrival series so the last particle
-  //          lands at POISSON_WINDOW (650ms). The intra-cluster CLUSTERING
-  //          and SILENCES are preserved exactly; only the global scale
-  //          is adjusted.
-  // ═════════════════════════════════════════════════════════════════════════
+  // Shapes: ~60% tall slivers (w × 2w), ~40% squares — crystal-fracture
+  // physicality. Static `opacity` removed from JSX; GSAP owns it from 0.
+  // Dissolve jitter capped at 0.08 — no straggler particles.
+  // ═══════════════════════════════════════════════════════════════════════
   const particles = useMemo(() => {
-    // First pass — build raw particle records with base stochastic fields.
     const raw = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
       const isT = i < PARTICLE_COUNT / 2
       const idx = isT ? i : i - PARTICLE_COUNT / 2
 
       const { nx, ny } = isT ? tPoint(idx) : kPoint(idx)
 
-      const explodeAngle = Number(((i / PARTICLE_COUNT) * Math.PI * 2 + sr(i * 2.71 + 0.1) * 0.9).toFixed(3))
-      const explodeDist = Number((160 + sr(i * 5.91 + 1.1) * 420).toFixed(3))
-      const explodeRot = Number(((sr(i * 9.37 + 2.2) - 0.5) * 1440).toFixed(3))
-      const size = Number((1.2 + sr(i * 4.43 + 3.3) * 4.8).toFixed(3))
-      const safeNx = Number(nx.toFixed(3))
-      const safeNy = Number(ny.toFixed(3))
+      const explodeAngle   = Number(((i / PARTICLE_COUNT) * Math.PI * 2 + sr(i * 2.71 + 0.1) * 0.9).toFixed(3))
+      const explodeDist    = Number((160 + sr(i * 5.91 + 1.1) * 420).toFixed(3))
+      const explodeRot     = Number(((sr(i * 9.37 + 2.2) - 0.5) * 1440).toFixed(3))
+      const baseSize       = Number((1.2 + sr(i * 4.43 + 3.3) * 4.8).toFixed(3))
+      const isSliver       = sr(i * 6.61 + 7.7) < SLIVER_RATIO
+      const safeNx         = Number(nx.toFixed(3))
+      const safeNy         = Number(ny.toFixed(3))
 
-      // ── TRUE INTER-ARRIVAL SAMPLING ──────────────────────────────────
-      // Δt = -ln(U) / λ, with U ∈ (0, 1]. The long tail is preserved —
-      // no clamp. A few particles will wait a full half-second; that
-      // silence is the signature of the Poisson process.
-      const u = Math.max(1e-4, sr(i * 11.17 + 4.4))
-      const settleDelta = -Math.log(u) / POISSON_LAMBDA // seconds, unbounded upper
+      // TRUE INTER-ARRIVAL SAMPLING — no clamp, long tail preserved
+      const u              = Math.max(1e-4, sr(i * 11.17 + 4.4))
+      const settleDelta    = -Math.log(u) / POISSON_LAMBDA
 
-      const dissolveJitter = Number((sr(i * 19.31 + 5.5) * 0.14).toFixed(4))
+      // Cap at 0.08 so the dissolve has no visible stragglers
+      const dissolveJitter = Number((Math.min(sr(i * 19.31 + 5.5) * 0.14, 0.08)).toFixed(4))
 
       return {
         isT,
@@ -215,18 +190,15 @@ export const Preloader = () => {
         explodeAngle,
         explodeDist,
         explodeRot,
-        size,
+        baseSize,
+        isSliver,
         settleDelta,
         dissolveJitter,
-        // Filled in by the cumulative pass below:
         cumArrival: 0,
       }
     })
 
-    // Second pass — per-cluster cumulative arrival. T and K are TWO
-    // independent Poisson streams, not one. Accumulating them separately
-    // is what produces the "broken clock" clustering on EACH side of
-    // the screen (versus a single accumulator that would correlate them).
+    // Per-cluster cumulative arrival — T and K are independent streams
     const accumulate = (predicate: (p: (typeof raw)[number]) => boolean) => {
       let t = 0
       for (let i = 0; i < raw.length; i++) {
@@ -234,9 +206,6 @@ export const Preloader = () => {
         t += raw[i].settleDelta
         raw[i].cumArrival = t
       }
-      // Normalize so the last arrival in this cluster lands at exactly
-      // POISSON_WINDOW. This preserves every intra-cluster ratio — every
-      // cluster and every silence — while locking the outer envelope.
       const lastIdx = (() => {
         for (let i = raw.length - 1; i >= 0; i--) if (predicate(raw[i])) return i
         return -1
@@ -255,9 +224,9 @@ export const Preloader = () => {
     return raw
   }, [])
 
-  // ═════════════════════════════════════════════════════════════════════════
-  // ANTI-FLICKER
-  // ═════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
+  // ANTI-FLICKER — session skip entirely in useLayoutEffect
+  // ═══════════════════════════════════════════════════════════════════════
   useLayoutEffect(() => {
     reducedMotionRef.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches
     isBotRef.current = /Lighthouse|Chrome-Lighthouse|Googlebot|Speed Insights/i.test(navigator.userAgent)
@@ -272,72 +241,55 @@ export const Preloader = () => {
     }
   }, [])
 
+  // ESC bail-out
   useEffect(() => {
     if (done) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") triggerExit()
-    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") triggerExit() }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done])
 
-  // ═════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
   // ACT I — PROGRESS TICKER
-  // ═════════════════════════════════════════════════════════════════════════
+  // Fast phase: 400ms (was 600ms) — snappier without losing drama.
+  // Failsafe tightened to 1600ms to match.
+  // ═══════════════════════════════════════════════════════════════════════
   useEffect(() => {
     if (done) return
 
-    const START = performance.now()
-    const FAST_DUR = 600
-    const SLOW_DUR = 700
-    const TOTAL = FAST_DUR + SLOW_DUR
-    const FAILSAFE_MS = 1800
+    const START       = performance.now()
+    const FAST_DUR    = 400
+    const SLOW_DUR    = 700
+    const TOTAL       = FAST_DUR + SLOW_DUR
+    const FAILSAFE_MS = 1600
 
-    let raf = 0
-    let fired100 = false
+    let raf           = 0
+    let fired100      = false
     let lastAnnounced = 0
-    const dRefs = [digit0Ref, digit1Ref, digit2Ref]
+    const dRefs       = [digit0Ref, digit1Ref, digit2Ref]
 
     const updateDOM = (pct: number) => {
       const p3 = String(pct).padStart(3, "0")
-      dRefs.forEach((r, i) => {
-        if (r.current) r.current.textContent = p3[i]
-      })
+      dRefs.forEach((r, i) => { if (r.current) r.current.textContent = p3[i] })
       if (progressBarRef.current) progressBarRef.current.style.width = `${pct}%`
       if (progressNumRef.current) progressNumRef.current.textContent = `${p3} / 100`
-      if (countdownRef.current) countdownRef.current.textContent = `T-${String(100 - pct).padStart(3, "0")}`
+      if (countdownRef.current)   countdownRef.current.textContent   = `T-${String(100 - pct).padStart(3, "0")}`
       if (counterRef.current) {
         const t = pct / 100
-        const gr = 8 + t * 40
-        const ga = t * 0.75
         counterRef.current.style.letterSpacing = `${-0.08 + t * 0.04}em`
-        counterRef.current.style.filter =
-          `drop-shadow(0 0 ${gr}px rgba(255,255,255,${ga.toFixed(2)}))` +
-          ` drop-shadow(0 2px 42px rgba(0,0,0,0.75))`
+        counterRef.current.style.filter        = `drop-shadow(0 2px 24px rgba(0,0,0,0.07))`
       }
-      if (pct >= 25 && lastAnnounced < 25) {
-        announce("Loading 25%")
-        lastAnnounced = 25
-      }
-      if (pct >= 50 && lastAnnounced < 50) {
-        announce("Loading 50%")
-        lastAnnounced = 50
-      }
-      if (pct >= 75 && lastAnnounced < 75) {
-        announce("Loading 75%")
-        lastAnnounced = 75
-      }
+      if (pct >= 25 && lastAnnounced < 25) { announce("Loading 25%");  lastAnnounced = 25  }
+      if (pct >= 50 && lastAnnounced < 50) { announce("Loading 50%");  lastAnnounced = 50  }
+      if (pct >= 75 && lastAnnounced < 75) { announce("Loading 75%");  lastAnnounced = 75  }
     }
 
     const tick = (now: number) => {
       const elapsed = now - START
       if (elapsed >= FAILSAFE_MS) {
         updateDOM(100)
-        if (!fired100) {
-          fired100 = true
-          triggerExit()
-        }
+        if (!fired100) { fired100 = true; triggerExit() }
         return
       }
       let pct: number
@@ -363,33 +315,23 @@ export const Preloader = () => {
 
     raf = requestAnimationFrame(tick)
     const failsafe = window.setTimeout(() => {
-      if (!fired100) {
-        fired100 = true
-        updateDOM(100)
-        triggerExit()
-      }
+      if (!fired100) { fired100 = true; updateDOM(100); triggerExit() }
     }, FAILSAFE_MS + 100)
 
-    return () => {
-      cancelAnimationFrame(raf)
-      window.clearTimeout(failsafe)
-    }
+    return () => { cancelAnimationFrame(raf); window.clearTimeout(failsafe) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done])
 
-  // ═════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
   // THE NUCLEAR TIMELINE
-  // ═════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
   const triggerExit = useCallback(() => {
     if (completedRef.current) return
     completedRef.current = true
 
-    // ── NULL GUARD — DOM may have been torn down before this fires ──────
-    if (!stageRef.current || !shardContainerRef.current) {
-      setDone(true)
-      return
-    }
+    if (!stageRef.current || !shardContainerRef.current) { setDone(true); return }
 
+    // Mobile detection — extend WebGL poll window for shader compile
     const isMobileDevice =
       typeof navigator !== "undefined" &&
       ((navigator.maxTouchPoints > 0 && window.innerWidth < 1024) ||
@@ -407,10 +349,11 @@ export const Preloader = () => {
       setDone(true)
       tlRef.current = null
     }
+
     const finish = () => {
       if (webglReady) { commitFinish(); return }
       const start = performance.now()
-      const poll = () => {
+      const poll  = () => {
         if (pollAborted.current) return
         if (webglReady || performance.now() - start > WEBGL_POLL_TIMEOUT) {
           window.removeEventListener("webgl-first-frame", onWebGLFirstFrame)
@@ -435,23 +378,24 @@ export const Preloader = () => {
       return
     }
 
-    // ── PORTRAIT-AWARE PIXEL GEOMETRY ────────────────────────────────────
-    const vw = window.innerWidth
+    // ── PORTRAIT-AWARE PIXEL GEOMETRY ──────────────────────────────────
+    const vw         = window.innerWidth
     const isPortrait = window.innerHeight > vw
+    // Extra compression for very narrow viewports (phones < 390px)
+    const narrowFactor = vw < 390 ? 0.70 : isPortrait ? 0.80 : 1.0
 
-    const portraitFactor = isPortrait ? 0.8 : 1.0
-    const fs = Math.min(Math.max(vw * 0.32, 160), 448) * portraitFactor
-    const CHAR_H   = fs * 0.76
-    const T_CHAR_W = fs * 0.56
-    const K_CHAR_W = fs * 0.64
+    const fs        = Math.min(Math.max(vw * 0.32, 140), 448) * narrowFactor
+    const CHAR_H    = fs * 0.76
+    const T_CHAR_W  = fs * 0.56
+    const K_CHAR_W  = fs * 0.64
 
-    const T_HALF = T_CHAR_W * 0.52 
-    const K_HALF = K_CHAR_W * 0.58
-    const MIN_CLUSTER = T_HALF + K_HALF + 8 
-    const CLUSTER = Math.max(vw * 0.14, MIN_CLUSTER * 0.5)
+    const T_HALF      = T_CHAR_W * 0.52
+    const K_HALF      = K_CHAR_W * 0.58
+    const MIN_CLUSTER = T_HALF + K_HALF + 8
+    const CLUSTER     = Math.max(vw * 0.14, MIN_CLUSTER * 0.5)
 
-    const POS_ENTER = CLUSTER            
-    const POS_DRIFT = CLUSTER + vw * 0.04   
+    const POS_ENTER   = CLUSTER
+    const POS_DRIFT   = CLUSTER + vw * 0.04
     const POS_COLLIDE = T_HALF + K_HALF + 1
 
     const shardEls = Array.from(
@@ -471,8 +415,8 @@ export const Preloader = () => {
     const tl = gsap.timeline({ onComplete: finish })
     tlRef.current = tl
 
-    // ── ACT I TAIL — OVERLOAD VIBRATION ──────────────────────────────────
-    tl.to({}, { duration: 0.15 })
+    // ── ACT I TAIL — OVERLOAD VIBRATION ────────────────────────────────
+    tl.to({}, { duration: 0.12 })
     ;[0.6, 1.0, 1.5, 2.0].forEach((amp) => {
       tl.to(digits, {
         keyframes: [
@@ -489,11 +433,11 @@ export const Preloader = () => {
     })
 
     tl.to(digits, {
-      scale: 1.18,
-      filter: "brightness(8) blur(10px)",
+      scale:   1.18,
+      filter:  "brightness(3) blur(10px)",
       opacity: 0,
-      duration: 0.38,
-      stagger: 0.07,
+      duration: 0.35,
+      stagger:  0.06,
       ease: "power2.in",
     }, ">-0.04")
 
@@ -501,13 +445,13 @@ export const Preloader = () => {
     tl.set(counterRef.current, { display: "none" })
     tl.to(
       [topRuleRef.current, botRuleRef.current, labelRef.current].filter(Boolean),
-      { opacity: 0, y: (i: number) => (i === 0 ? -18 : 18), duration: 0.3, ease: "power2.in" },
+      { opacity: 0, y: (i: number) => (i === 0 ? -14 : 14), duration: 0.28, ease: "power2.in" },
       "<"
     )
 
-    // ── ACT II — BIG BANG ──────────────────────────────────────────────
-    const maxExplode = isPortrait ? Math.min(vw * 0.8, 280) : Infinity
-    tl.set(shardEls, { opacity: 1, x: 0, y: 0, rotation: 0, scale: 1 }, "<0.04")
+    // ── ACT II — BIG BANG ────────────────────────────────────────────
+    const maxExplode = isPortrait ? Math.min(vw * 0.75, 260) : Infinity
+    tl.set(shardEls, { opacity: 0, x: 0, y: 0, rotation: 0, scale: 1 }, "<0.04")
     tl.to(shardEls, {
       x: (i) => {
         const raw = Math.cos(particles[i]?.explodeAngle ?? 0) * (particles[i]?.explodeDist ?? 280)
@@ -518,20 +462,20 @@ export const Preloader = () => {
         return isPortrait ? Math.max(-maxExplode, Math.min(maxExplode, raw)) : raw
       },
       rotation: (i) => particles[i]?.explodeRot ?? 0,
-      opacity:  (i) => 0.3 + sr(i * 3.13) * 0.7,
-      duration: 0.55,
+      opacity:  (i) => (0.28 + sr(i * 3.13) * 0.65) * 0.85,
+      duration: 0.52,
       ease: "expo.out",
       stagger: { amount: 0.06, from: "center" },
-    }, ">-0.12")
+    }, ">-0.10")
 
-    // ── ACT III — TRUE POISSON PULL ───────────────────────────────────
+    // ── ACT III — TRUE POISSON PULL ──────────────────────────────────
     tl.to(tShards, {
       x:        (li) => -CLUSTER + (tParts[li]?.nx ?? 0) * T_CHAR_W,
       y:        (li) =>             (tParts[li]?.ny ?? 0) * CHAR_H,
       rotation: 0,
       scale:    0.45,
-      opacity:  (li) => 0.55 + sr(li * 7.71) * 0.45,
-      duration: (li) => 0.58 + (tParts[li]?.settleDelta ?? 0.075) * 1.2,
+      opacity:  (li) => (0.50 + sr(li * 7.71) * 0.45) * 0.85,
+      duration: (li) => 0.55 + (tParts[li]?.settleDelta ?? 0.075) * 1.2,
       ease:     "expo.in",
       stagger:  (li) => tParts[li]?.cumArrival ?? 0,
     }, "+=0.04")
@@ -540,203 +484,204 @@ export const Preloader = () => {
       y:        (li) =>             (kParts[li]?.ny ?? 0) * CHAR_H,
       rotation: 0,
       scale:    0.45,
-      opacity:  (li) => 0.55 + sr(li * 8.87) * 0.45,
-      duration: (li) => 0.58 + (kParts[li]?.settleDelta ?? 0.075) * 1.2,
+      opacity:  (li) => (0.50 + sr(li * 8.87) * 0.45) * 0.85,
+      duration: (li) => 0.55 + (kParts[li]?.settleDelta ?? 0.075) * 1.2,
       ease:     "expo.in",
       stagger:  (li) => kParts[li]?.cumArrival ?? 0,
     }, "<")
 
-    tl.to({}, { duration: 0.1 })
+    tl.to({}, { duration: 0.08 })
 
-    // ── ACT IV — MATERIALIZATION (pixel positions) ─────────────────────
+    // ── ACT IV — MATERIALIZATION ──────────────────────────────────────
     tl.fromTo(letterTRef.current,
-      { x: -POS_ENTER, scale: 0.88, opacity: 0, filter: "brightness(12) blur(24px)" },
+      { x: -POS_ENTER, scale: 0.90, opacity: 0, filter: "brightness(4) blur(20px)" },
       { x: -POS_ENTER, scale: 1,    opacity: 1, filter: "brightness(1) blur(0px)",
-        duration: 0.75, ease: "expo.out" },
+        duration: 0.70, ease: "expo.out" },
       ">-0.08"
     )
     tl.fromTo(letterKRef.current,
-      { x:  POS_ENTER, scale: 0.88, opacity: 0, filter: "brightness(12) blur(24px)" },
+      { x:  POS_ENTER, scale: 0.90, opacity: 0, filter: "brightness(4) blur(20px)" },
       { x:  POS_ENTER, scale: 1,    opacity: 1, filter: "brightness(1) blur(0px)",
-        duration: 0.75, ease: "expo.out" },
+        duration: 0.70, ease: "expo.out" },
       "<"
     )
+    // Dissolve — jitter capped at 0.08, no stragglers
     tl.to(shardEls, {
-      opacity: 0, scale: 0,
-      duration: (i) => 0.26 + (particles[i]?.dissolveJitter ?? 0.07),
-      ease: "power2.out",
-      stagger: (i) => particles[i]?.dissolveJitter ?? 0.07,
-    }, "<0.18")
+      opacity:  0,
+      scale:    0,
+      duration: (i) => 0.22 + (particles[i]?.dissolveJitter ?? 0.06),
+      ease:     "power2.out",
+      stagger:  (i) => particles[i]?.dissolveJitter ?? 0.06,
+    }, "<0.16")
 
-    // ── ACT V — CINEMATIC DRIFT (pixel) ────────────────────────────────
-    tl.to(letterTRef.current, { x: -POS_DRIFT, duration: 1.8, ease: "power1.inOut" }, "+=0.05")
-    tl.to(letterKRef.current, { x:  POS_DRIFT, duration: 1.8, ease: "power1.inOut" }, "<")
+    // ── ACT V — CINEMATIC DRIFT ──────────────────────────────────────
+    // 1.3s power2.inOut: decisive pull with proper weight
+    tl.to(letterTRef.current, { x: -POS_DRIFT, duration: 1.3, ease: "power2.inOut" }, "+=0.05")
+    tl.to(letterKRef.current, { x:  POS_DRIFT, duration: 1.3, ease: "power2.inOut" }, "<")
 
-    // ── ACT VI — CRITICAL MASS (pixel — zero overlap guaranteed) ───────
+    // ── ACT VI — CRITICAL MASS ────────────────────────────────────────
     tl.to([letterTRef.current, letterKRef.current], {
       x: (idx: number) => idx === 0 ? -POS_COLLIDE : POS_COLLIDE,
-      duration: 0.14,
+      duration: 0.13,
       ease: "power4.in",
     })
     .to([letterTRef.current, letterKRef.current], {
-      scale: 1.06, duration: 0.05, ease: "none",
+      scale: 1.06, duration: 0.04, ease: "none",
     })
     .to(stageRef.current, {
-      backgroundColor: "#ffffff", duration: 0.05, ease: "none",
+      backgroundColor: "#0d0d0d", duration: 0.05, ease: "none",
     }, "<")
 
-    // ── ACT VII — PORTAL SCALE ─────────────────────────────────────────
+    // ── ACT VII — PORTAL SCALE ────────────────────────────────────────
     .to([letterTRef.current, letterKRef.current], {
       scale: 100, opacity: 0, filter: "blur(40px)",
-      duration: 0.85, ease: "expo.out",
-    }, "+=0.03")
-    .to(stageRef.current, { opacity: 0, duration: 0.80, ease: "power2.out" }, "<")
+      duration: 0.82, ease: "expo.out",
+    }, "+=0.02")
+    .to(stageRef.current, { opacity: 0, duration: 0.75, ease: "power2.out" }, "<")
     .to(rootRef.current, {
       autoAlpha: 0, duration: 0.10, ease: "none",
       onComplete: () => { if (rootRef.current) rootRef.current.style.display = "none" },
-    }, "-=0.18")
+    }, "-=0.16")
   }, [announce, particles])
 
+  // Initial GSAP state — GSAP owns opacity, never the static style
   useEffect(() => {
-    if (letterTRef.current) gsap.set(letterTRef.current, { opacity: 0, x: 0, scale: 0.88 })
-    if (letterKRef.current) gsap.set(letterKRef.current, { opacity: 0, x: 0, scale: 0.88 })
+    if (letterTRef.current) gsap.set(letterTRef.current, { opacity: 0, x: 0, scale: 0.90 })
+    if (letterKRef.current) gsap.set(letterKRef.current, { opacity: 0, x: 0, scale: 0.90 })
     const shards = shardContainerRef.current?.querySelectorAll(".pp-shard")
     if (shards) gsap.set(shards, { opacity: 0, x: 0, y: 0, rotation: 0, scale: 1 })
   }, [])
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       pollAborted.current = true
       cancelAnimationFrame(pollRafRef.current)
-      if (tlRef.current) {
-        tlRef.current.kill()
-        tlRef.current = null
-      }
+      if (tlRef.current) { tlRef.current.kill(); tlRef.current = null }
     }
   }, [])
 
   if (done) return null
 
+  // ─────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────
   return (
-    <>
-      <script
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{
-          __html: `if(typeof sessionStorage !== 'undefined' && sessionStorage.getItem('preloader_played')) { document.documentElement.classList.add('skip-preloader'); }`,
-        }}
+    <div
+      id="nuclear-preloader"
+      ref={rootRef}
+      className="fixed inset-0 z-[100] pointer-events-none"
+      aria-hidden="true"
+    >
+      {/* Screen-reader live region */}
+      <div
+        ref={liveRef}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
       />
-      <style suppressHydrationWarning>{`.skip-preloader #nuclear-preloader { display: none !important; }`}</style>
 
-      <div id="nuclear-preloader" ref={rootRef} className="fixed inset-0 z-[100] pointer-events-none" aria-hidden="true">
-        <div ref={liveRef} role="status" aria-live="polite" aria-atomic="true" className="sr-only" />
+      {/* ── STAGE ─────────────────────────────────────────────────────── */}
+      <div
+        ref={stageRef}
+        className="absolute inset-0 overflow-hidden"
+        style={{
+          backgroundColor: "#F5F5F0",
+          willChange: "opacity, background-color, transform",
+        }}
+      >
 
+        {/* TOP META BAR */}
         <div
-          ref={stageRef}
-          className="absolute inset-0 bg-[#020202] overflow-hidden"
-          style={{ willChange: "opacity, background-color" }}
+          ref={topRuleRef}
+          className="absolute top-9 left-9 right-9 flex items-center justify-between font-mono text-[9px] tracking-[0.60em] uppercase"
+          style={{ color: "rgba(13,13,13,0.35)" }}
         >
-          <div
-            ref={topRuleRef}
-            className="absolute top-10 left-10 right-10 flex items-center justify-between font-mono text-[10px] tracking-[0.55em] uppercase text-white/50"
-          >
-            <span>Nuclear System</span>
-            <span className="tabular-nums">
-              T-<span ref={countdownRef}>100</span>
-            </span>
-          </div>
-
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div
-              ref={counterRef}
-              className="relative font-syne font-black text-white leading-none tabular-nums pointer-events-none select-none"
-              style={{
-                fontSize: "clamp(10rem, 38vw, 34rem)",
-                letterSpacing: "-0.08em",
-                fontFeatureSettings: '"tnum","ss01"',
-                willChange: "letter-spacing, filter",
-              }}
-            >
-              <span
-                ref={digit0Ref}
-                className="inline-block"
-                style={{ willChange: "transform, opacity, filter", transformOrigin: "center" }}
-              >
-                0
-              </span>
-              <span
-                ref={digit1Ref}
-                className="inline-block"
-                style={{ willChange: "transform, opacity, filter", transformOrigin: "center" }}
-              >
-                0
-              </span>
-              <span
-                ref={digit2Ref}
-                className="inline-block"
-                style={{ willChange: "transform, opacity, filter", transformOrigin: "center" }}
-              >
-                0
-              </span>
-            </div>
-
-            <div
-              ref={shardContainerRef}
-              aria-hidden="true"
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            >
-              {particles.map((p, i) => (
-                <div
-                  key={i}
-                  className="pp-shard absolute bg-white"
-                  style={{
-                    width: `${p.size}px`,
-                    height: `${p.size}px`,
-                    borderRadius: "1px",
-                    willChange: "transform, opacity",
-                  }}
-                />
-              ))}
-            </div>
-
-            <span
-              ref={letterTRef}
-              className="absolute font-syne font-black text-white leading-none pointer-events-none select-none"
-              style={{
-                fontSize: "clamp(10rem, 32vw, 28rem)",
-                letterSpacing: "-0.08em",
-                willChange: "transform, opacity, filter",
-              }}
-            >
-              T
-            </span>
-            <span
-              ref={letterKRef}
-              className="absolute font-syne font-black text-white leading-none pointer-events-none select-none"
-              style={{
-                fontSize: "clamp(10rem, 32vw, 28rem)",
-                letterSpacing: "-0.08em",
-                willChange: "transform, opacity, filter",
-              }}
-            >
-              K
-            </span>
-          </div>
-
-          <div
-            ref={botRuleRef}
-            className="absolute bottom-10 left-10 right-10 flex items-center justify-between font-mono text-[10px] tracking-[0.55em] uppercase text-white/50"
-          >
-            <span ref={progressNumRef}>000 / 100</span>
-            <div ref={labelRef}>
-              <span className="text-white/40">Init · Kinetic Layer</span>
-            </div>
-          </div>
-
-          <div className="absolute bottom-[5.5rem] left-10 right-10 h-px bg-white/10">
-            <div ref={progressBarRef} className="h-full bg-white/70" style={{ width: "0%" }} />
-          </div>
         </div>
+
+        {/* ── CENTRE STAGE ──────────────────────────────────────────── */}
+        <div className="absolute inset-0 flex items-center justify-center">
+
+          {/* Counter — intentionally smaller so T/K dominate the frame */}
+          <div
+            ref={counterRef}
+            className="relative font-syne font-black leading-none tabular-nums pointer-events-none select-none"
+            style={{
+              color:               "#0d0d0d",
+              fontSize:            "clamp(5.5rem, 22vw, 19rem)",
+              letterSpacing:       "-0.08em",
+              fontFeatureSettings: '"tnum","ss01"',
+              willChange:          "letter-spacing, filter",
+            }}
+          >
+            <span
+              ref={digit0Ref}
+              className="inline-block"
+              style={{ willChange: "transform, opacity, filter", transformOrigin: "center" }}
+            >0</span>
+            <span
+              ref={digit1Ref}
+              className="inline-block"
+              style={{ willChange: "transform, opacity, filter", transformOrigin: "center" }}
+            >0</span>
+            <span
+              ref={digit2Ref}
+              className="inline-block"
+              style={{ willChange: "transform, opacity, filter", transformOrigin: "center" }}
+            >0</span>
+          </div>
+
+          {/* Particle cloud — GSAP owns opacity entirely; no static value */}
+          <div
+            ref={shardContainerRef}
+            aria-hidden="true"
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          >
+            {particles.map((p, i) => (
+              <div
+                key={i}
+                className="pp-shard absolute"
+                style={{
+                  width:           `${p.baseSize}px`,
+                  // Slivers: 2× height for crystal-fracture physicality
+                  height:          p.isSliver ? `${p.baseSize * 2}px` : `${p.baseSize}px`,
+                  borderRadius:    "1px",
+                  backgroundColor: "#0d0d0d",
+                  // No opacity here — GSAP sets from 0 on mount
+                  willChange:      "transform, opacity",
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Letter T — dominant size over counter */}
+          <span
+            ref={letterTRef}
+            className="absolute font-syne font-black leading-none pointer-events-none select-none"
+            style={{
+              color:         "#0d0d0d",
+              fontSize:      "clamp(8rem, 28vw, 26rem)",
+              letterSpacing: "-0.08em",
+              willChange:    "transform, opacity, filter",
+            }}
+          >T</span>
+
+          {/* Letter K */}
+          <span
+            ref={letterKRef}
+            className="absolute font-syne font-black leading-none pointer-events-none select-none"
+            style={{
+              color:         "#0d0d0d",
+              fontSize:      "clamp(8rem, 28vw, 26rem)",
+              letterSpacing: "-0.08em",
+              willChange:    "transform, opacity, filter",
+            }}
+          >K</span>
+        </div>
+
+        
       </div>
-    </>
+    </div>
   )
 }

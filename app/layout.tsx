@@ -4,11 +4,11 @@ import "./globals.css";
 import { LenisProvider } from "@/components/providers/lenis-provider";
 import { Cursor } from "@/components/ui/cursor";
 import { LanguageProvider } from "@/components/navigation/language-toggle";
-import { Preloader } from "@/components/ui/preloader";
 import { DynamicFavicon } from "@/components/dynamic-favicon";
+import { Preloader } from "@/components/ui/preloader"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { DelayedRenderer } from "@/components/providers/delayed-renderer";
-import { VelocityDriver } from "@/components/providers/velocity-driver"; 
+import { VelocityDriver } from "@/components/providers/velocity-driver";
 
 const syne = Syne({ subsets: ["latin"], weight: ["400", "700", "800"], variable: "--font-syne", display: "swap" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
@@ -18,13 +18,12 @@ export const metadata: Metadata = {
   title: "Tomáš Kratochvíl — System Architect",
   description: "Creative developer crafting digital experiences with zero-error tolerance.",
   verification: {
-    // TADY JE TVŮJ GOOGLE TAG
     google: "1CP365_WIYoOWEKM24OqSPiXYtj-KMHNrMeU3Fz-aJ8"
   }
 };
 
 export const viewport: Viewport = {
-  themeColor: "#010101", 
+  themeColor: "#010101",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -32,8 +31,7 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  
-  // ZBRAŇ HROMADNÉHO NIČENÍ PRO SEO
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Person",
@@ -49,23 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <html lang="en" className={`${syne.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} no-scrollbar overflow-x-hidden`} suppressHydrationWarning>
-      {/* ZMĚNĚNO: suppressHydrationWarning přidán na head a scripty, aby je Chrome extensions nemohly shodit */}
       <head suppressHydrationWarning>
-        <script suppressHydrationWarning dangerouslySetInnerHTML={{
-          __html: `
-            (function() {
-              try {
-                var isBot = /Lighthouse|Chrome-Lighthouse|Googlebot|Speed Insights/i.test(navigator.userAgent);
-                var played = sessionStorage.getItem('preloader_played');
-                if (isBot || played) {
-                  document.documentElement.classList.add('is-bot');
-                }
-              } catch(e) {}
-            })();
-          `
-        }} />
-        
-        {/* Vložení JSON-LD přímo do hlavičky pro Google Bota */}
         <script
           type="application/ld+json"
           suppressHydrationWarning
@@ -81,14 +63,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <DynamicFavicon />
           </LenisProvider>
         </LanguageProvider>
-        
-        {/* ZMĚNĚNO: Odsunutí ne-kritických nástrojů mimo hlavní renderovací okno bota */}
+
         <div style={{ display: 'none' }} className="is-bot-hide">
            <SpeedInsights />
         </div>
-        
+
         <DelayedRenderer delay={2500}>
-         <Cursor /> 
+         <Cursor />
         </DelayedRenderer>
       </body>
     </html>

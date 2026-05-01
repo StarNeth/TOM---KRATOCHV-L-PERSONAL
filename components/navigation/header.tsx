@@ -236,15 +236,17 @@ const MobileMenuOverlay = ({
       <div className="mobile-nav-footer absolute bottom-12 left-0 right-0 flex flex-col items-center gap-6">
         <button
           onClick={toggleLanguage}
-          className="flex items-center gap-2 px-4 py-2 border border-white/20 rounded-full font-mono text-[10px] tracking-widest uppercase text-white hover:bg-white/10"
+          /* ZMĚNĚNO: text-[10px] na text-sm pro lepší čitelnost na mobilu */
+          className="flex items-center gap-2 px-4 py-2 border border-white/20 rounded-full font-mono text-sm tracking-widest uppercase text-white hover:bg-white/10"
           style={{ transition: `background 240ms ${ease.mechanical}` }}
         >
-          <Globe className="w-3 h-3 animate-[spin_8s_linear_infinite]" />
+          {/* ZMĚNĚNO: w-3 h-3 na w-4 h-4 */}
+          <Globe className="w-4 h-4 animate-[spin_8s_linear_infinite]" />
           <span>{language === "cs" ? "CZECH" : "ENGLISH"}</span>
         </button>
 
         <div className="flex flex-col items-center gap-2 text-white/40">
-          <span className="font-mono text-[9px] tracking-[0.3em] uppercase">System Architect</span>
+          <span className="font-mono text-[9px] tracking-[0.3em] uppercase">Creative Developer</span>
           <div className="w-8 h-[1px] bg-white/20" />
           <span className="font-mono text-[8px] tracking-[0.2em]">Czech Republic</span>
         </div>
@@ -618,21 +620,25 @@ export const Header = () => {
             <HamburgerButton isOpen={isMobileMenuOpen} onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
           </div>
 
-          <div className="sys-element hidden md:flex flex-wrap justify-end items-center gap-x-5 gap-y-2 font-mono text-[10px] tracking-[0.2em] text-white uppercase drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]">
+          {/* ZMĚNĚNO: text-[10px] na text-sm */}
+          <div className="sys-element hidden md:flex flex-wrap justify-end items-center gap-x-5 gap-y-2 font-mono text-sm tracking-[0.2em] text-white uppercase drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]">
             <button
               onClick={toggleLanguage}
               className="flex items-center gap-1.5 hover:opacity-60 cursor-pointer"
               style={{ transition: `opacity 240ms ${ease.mechanical}` }}
             >
-              <Globe className="w-3 h-3 animate-[spin_8s_linear_infinite]" />
+              {/* ZMĚNĚNO: w-3 h-3 na w-4 h-4 */}
+              <Globe className="w-4 h-4 animate-[spin_8s_linear_infinite]" />
               <span>{language === "cs" ? "CZECH" : "ENGLISH"}</span>
             </button>
             <div className="flex items-center gap-1.5">
-              <Circle className="w-1.5 h-1.5 fill-white animate-pulse" />
+              {/* ZMĚNĚNO: w-1.5 h-1.5 na w-2 h-2 pro proporční vyvážení k textu */}
+              <Circle className="w-2 h-2 fill-white animate-pulse" />
               <span>{time}</span>
             </div>
             <div className="flex items-center gap-1.5 justify-end">
-              <Activity className="w-3 h-3 text-white" />
+              {/* ZMĚNĚNO: w-3 h-3 na w-4 h-4 */}
+              <Activity className="w-4 h-4 text-white" />
               <span className="text-white">{scrollProg.toString().padStart(2, "0")}%</span>
             </div>
           </div>

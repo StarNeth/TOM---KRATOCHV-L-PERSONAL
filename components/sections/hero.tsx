@@ -11,8 +11,8 @@ import { ease } from "@/lib/easing"
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger, useGSAP)
 
 const DICTIONARY = {
-  en: { dive: "Enter System", locale: "EN / CZ" },
-  cs: { dive: "Vstoupit do systému", locale: "CZ / EN" },
+  en: { dive: "Enter", locale: "EN / CZ" },
+  cs: { dive: "Vstup", locale: "CZ / EN" },
 }
 
 export const Hero = () => {
@@ -51,7 +51,27 @@ export const Hero = () => {
   useEffect(() => {
     const triggerAnim = (e: Event) => {
       const customEvent = e as CustomEvent
-      setAnimState({ ready: true, isBot: !!customEvent.detail?.isBot })
+      const isBot = !!customEvent.detail?.isBot
+      setAnimState({ ready: true, isBot })
+
+      const alreadyPlayed = !!sessionStorage.getItem("preloader_played")
+      if (alreadyPlayed || isBot) {
+        gsap.set([firstRowRef.current, secondRowRef.current], {
+          yPercent: 0,
+          opacity: 1,
+          filter: "blur(0px)",
+          clearProps: "willChange",
+        })
+        gsap.set(".hero-ui", { opacity: 1, y: 0 })
+      } else {
+        gsap.to([firstRowRef.current, secondRowRef.current], {
+          opacity: 1,
+          duration: 0.6,
+          delay: 0.2,
+          stagger: 0.04,
+          ease: "power2.out",
+        })
+      }
     }
     window.addEventListener("preloader-complete", triggerAnim)
 
@@ -229,6 +249,7 @@ export const Hero = () => {
               style={{
                 fontSize: "clamp(3.2rem, 15vw, 22rem)",
                 marginLeft: "-0.04em",
+                opacity: 0,
               }}
             >
               TOMÁŠ
@@ -243,6 +264,7 @@ export const Hero = () => {
                 color: "rgba(255,255,255,0.94)",
                 marginRight: "-0.04em",
                 whiteSpace: "nowrap",
+                opacity: 0,
               }}
             >
               KRATOCHVÍL
@@ -255,7 +277,7 @@ export const Hero = () => {
           style={{ textShadow: "0 0 16px rgba(0,0,0,0.75)" }}
         >
           <span className="block h-px w-10 bg-white/30" />
-          <span>System Architect</span>
+          <span>Creative Frontend Developer</span>
           <span className="block h-px w-10 bg-white/30" />
         </div>
       </div>
